@@ -1,34 +1,31 @@
-# execution/runner.py
-
 import subprocess
 import tempfile
 import os
 import time
 import shutil
+import sys
 
-
-TIME_LIMIT = 5  # seconds
+TIME_LIMIT = 5
 
 
 def run_code(user_code: str, user_input: str = ""):
     start_time = time.time()
-
     temp_dir = tempfile.mkdtemp()
 
     try:
         file_path = os.path.join(temp_dir, "main.py")
 
-        # Write user code to file
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(user_code)
 
-        # Execute subprocess
         process = subprocess.Popen(
-            ["python", file_path],
+            [sys.executable, file_path],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True
+            text=True,
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
+            cwd=temp_dir
         )
 
         try:
@@ -56,6 +53,8 @@ def run_code(user_code: str, user_input: str = ""):
 
         except subprocess.TimeoutExpired:
             process.kill()
+            process.wait()
+
             return {
                 "output": "",
                 "error": "Time Limit Exceeded",

@@ -1,0 +1,145 @@
+/* style.css */
+
+/* CSS Variables for easy color management */
+:root {
+    --bg-color: #F3F4F6;
+    --surface-color: #FFFFFF;
+    --border-color: #E5E7EB;
+    --text-main: #111827;
+    --text-muted: #6B7280;
+    --primary-btn: #2563EB;
+    --primary-btn-hover: #1D4ED8;
+    --output-bg: #F9FAFB;
+}
+
+/* Global Reset & Typography */
+body {
+    margin: 0;
+    padding: 20px;
+    background-color: var(--bg-color);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: var(--text-main);
+    display: flex;
+    justify-content: center;
+    height: 100vh;
+    box-sizing: border-box;
+}
+
+/* Main Application Window */
+.app-container {
+    width: 100%;
+    max-width: 1400px;
+    height: 100%;
+    background: var(--surface-color);
+    border-radius: 8px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+}
+
+/* Header Section */
+.app-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 24px;
+    border-bottom: 1px solid var(--border-color);
+    background-color: var(--surface-color);
+}
+
+.app-header h2 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+/* Run Button Styling */
+.run-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background-color: var(--primary-btn);
+    color: #FFFFFF;
+    border: none;
+    padding: 8px 16px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.run-btn:hover {
+    background-color: var(--primary-btn-hover);
+}
+
+/* Workspace Layout (Editor + Output) */
+.workspace {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    overflow: hidden;
+}
+
+/* Switch to Side-by-Side on larger screens */
+@media (min-width: 768px) {
+    .workspace {
+        flex-direction: row;
+    }
+}
+
+/* Editor Pane */
+.editor-pane {
+    flex: 2; /* Takes up 2/3 of the space */
+    border-bottom: 1px solid var(--border-color);
+    position: relative;
+}
+
+@media (min-width: 768px) {
+    .editor-pane {
+        border-bottom: none;
+        border-right: 1px solid var(--border-color);
+    }
+}
+
+#editor {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+/* Output Pane */
+.output-pane {
+    flex: 1; /* Takes up 1/3 of the space */
+    display: flex;
+    flex-direction: column;
+    background-color: var(--output-bg);
+}
+
+.output-header {
+    padding: 12px 16px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid var(--border-color);
+    background-color: var(--surface-color);
+}
+
+#output {
+    margin: 0;
+    padding: 16px;
+    flex-grow: 1;
+    font-family: 'Fira Code', Consolas, Monaco, monospace;
+    font-size: 0.875rem;
+    color: var(--text-main);
+    overflow-y: auto;
+    white-space: pre-wrap;
+    line-height: 1.5;
+}

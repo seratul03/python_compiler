@@ -1,13 +1,36 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Python Compiler</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
 
-<h2>Python Compiler</h2>
+<div class="app-container">
+    <header class="app-header">
+        <h2>Python Compiler</h2>
+        <button class="run-btn" onclick="runCode()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+            Run Code
+        </button>
+    </header>
 
-<div id="editor" style="height:500px;width:800px;"></div>
+    <div class="workspace">
+        <div class="editor-pane">
+            <div id="editor"></div>
+        </div>
+        
+        <div class="output-pane">
+            <div class="output-header">Output</div>
+            <pre id="output"></pre>
+        </div>
+    </div>
+</div>
 
 <script src="https://unpkg.com/monaco-editor@latest/min/vs/loader.js"></script>
 
@@ -15,24 +38,56 @@
 require.config({ paths: { vs: 'https://unpkg.com/monaco-editor@latest/min/vs' }});
 
 require(["vs/editor/editor.main"], function () {
+
+    // Define a clean, formal light theme
+    monaco.editor.defineTheme("formal-light", {
+        base: "vs", // 'vs' is the base light theme
+        inherit: true,
+        rules: [
+            { token: "comment", foreground: "008000", fontStyle: "italic" },
+            { token: "keyword", foreground: "0000FF" },
+            { token: "string", foreground: "A31515" },
+            { token: "number", foreground: "098658" },
+            { token: "identifier", foreground: "001080" }
+        ],
+        colors: {
+            "editor.background": "#FAFAFA",
+            "editor.lineHighlightBackground": "#F0F0F0",
+            "editorCursor.foreground": "#000000",
+            "editor.selectionBackground": "#ADD6FF",
+            "editorLineNumber.foreground": "#999999",
+            "editorLineNumber.activeForeground": "#333333"
+        }
+    });
+
     window.editor = monaco.editor.create(document.getElementById("editor"), {
         value: `print("Hello World")`,
         language: "python",
-        theme: "vs-light",
-        automaticLayout: true,
-        autoClosingBrackets: "always",
-        autoIndent: "full",
-        formatOnType: true,
-        formatOnPaste: true
+        theme: "formal-light",
+        automaticLayout: true, // Automatically adjusts to container size
+        
+        fontSize: 14, // Slightly scaled down for a more professional feel
+        fontFamily: "'Fira Code', Consolas, monospace",
+        fontLigatures: true,
+        
+        cursorBlinking: "smooth",
+        cursorStyle: "line",
+        
+        minimap: { enabled: false },
+        scrollBeyondLastLine: false,
+        wordWrap: "on",
+        padding: { top: 16, bottom: 16 } // Adds breathing room inside the editor
     });
+
+    // Ctrl + Enter to Run
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, function () {
+        if (typeof runCode === 'function') {
+            runCode();
+        }
+    });
+
 });
 </script>
-
-<br>
-<button onclick="runCode()">Run</button>
-
-<h3>Output:</h3>
-<pre id="output"></pre>
 
 <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
