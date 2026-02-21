@@ -13,12 +13,16 @@
 
 <div class="app-container">
     <header class="app-header">
-        <h2>Python Compiler</h2>
-        <button class="run-btn" onclick="runCode()">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+    <h2>Python Compiler</h2>
+    <div style="display:flex; gap:10px;">
+        <button type="button" class="run-btn" onclick="runCode()">
             Run Code
         </button>
-    </header>
+        <button type="button" class="run-btn" style="background:#6B7280;" onclick="resetCompiler()">
+            Reset
+        </button>
+    </div>
+</header>
 
     <div class="workspace">
         <div class="editor-pane">
@@ -26,10 +30,10 @@
         </div>
         
         <div class="output-pane">
-            <div class="output-header">Output</div>
-            <pre id="output"></pre>
-        </div>
-    </div>
+    <div class="output-header">Output</div>
+    <div id="output" contenteditable="true"></div>
+</div>
+</div>
 </div>
 
 <script src="https://unpkg.com/monaco-editor@latest/min/vs/loader.js"></script>

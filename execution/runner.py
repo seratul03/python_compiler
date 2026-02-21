@@ -1,66 +1,92 @@
 import subprocess
 import tempfile
 import os
-import time
 import shutil
 import sys
+import uuid
+import threading
 
-TIME_LIMIT = 5
+active_processes = {}
 
-
-def run_code(user_code: str, user_input: str = ""):
-    start_time = time.time()
+def start_process(user_code):
     temp_dir = tempfile.mkdtemp()
+    file_path = os.path.join(temp_dir, "main.py")
+
+    with open(file_path, "w", encoding="utf-8") as f:
+        f.write(user_code)
+
+    process = subprocess.Popen(
+        [sys.executable, "-u", file_path],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        cwd=temp_dir,
+        bufsize=1
+    )
+
+    pid = str(uuid.uuid4())
+
+    active_processes[pid] = {
+        "process": process,
+        "temp_dir": temp_dir,
+        "buffer": ""
+    }
+
+    # Background thread to continuously read output, including prompts without newlines
+    def reader():
+        while True:
+            chunk = process.stdout.read(1)
+            if chunk == "":
+                break
+            if pid in active_processes:
+                active_processes[pid]["buffer"] += chunk
+
+    threading.Thread(target=reader, daemon=True).start()
+
+    return pid
+
+
+def send_input(pid, user_input):
+    if pid not in active_processes:
+        return {"error": "Process not found."}
+
+    process = active_processes[pid]["process"]
 
     try:
-        file_path = os.path.join(temp_dir, "main.py")
+        process.stdin.write(user_input + "\n")
+        process.stdin.flush()
+        return {"status": "sent"}
+    except:
+        return {"error": "Execution error."}
 
-        with open(file_path, "w", encoding="utf-8") as f:
-            f.write(user_code)
 
-        process = subprocess.Popen(
-            [sys.executable, file_path],
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
-            cwd=temp_dir
-        )
+def read_output(pid):
+    if pid not in active_processes:
+        return {"error": "Process not found."}
+
+    process_data = active_processes[pid]
+    process = process_data["process"]
+
+    output = process_data["buffer"]
+    process_data["buffer"] = ""
+
+    if process.poll() is not None:
+        cleanup(pid)
+        return {"output": output, "finished": True}
+
+    return {"output": output}
+
+
+def cleanup(pid):
+    if pid in active_processes:
+        process = active_processes[pid]["process"]
+        temp_dir = active_processes[pid]["temp_dir"]
 
         try:
-            stdout, stderr = process.communicate(
-                input=user_input,
-                timeout=TIME_LIMIT
-            )
-
-            execution_time = round(time.time() - start_time, 3)
-
-            if process.returncode == 0:
-                return {
-                    "output": stdout,
-                    "error": "",
-                    "execution_time": execution_time,
-                    "status": "success"
-                }
-            else:
-                return {
-                    "output": "",
-                    "error": stderr,
-                    "execution_time": execution_time,
-                    "status": "error"
-                }
-
-        except subprocess.TimeoutExpired:
             process.kill()
-            process.wait()
+        except:
+            pass
 
-            return {
-                "output": "",
-                "error": "Time Limit Exceeded",
-                "execution_time": TIME_LIMIT,
-                "status": "timeout"
-            }
-
-    finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
+        del active_processes[pid]
