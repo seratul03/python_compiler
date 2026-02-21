@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Python Compiler</title>
+</head>
+<body>
+
+<h2>Python Compiler</h2>
+
+<div id="editor" style="height:500px;width:800px;"></div>
+
+<script src="https://unpkg.com/monaco-editor@latest/min/vs/loader.js"></script>
+
+<script>
+require.config({ paths: { vs: 'https://unpkg.com/monaco-editor@latest/min/vs' }});
+
+require(["vs/editor/editor.main"], function () {
+    window.editor = monaco.editor.create(document.getElementById("editor"), {
+        value: `print("Hello World")`,
+        language: "python",
+        theme: "vs-light",
+        automaticLayout: true,
+        autoClosingBrackets: "always",
+        autoIndent: "full",
+        formatOnType: true,
+        formatOnPaste: true
+    });
+});
+</script>
+
+<br>
+<button onclick="runCode()">Run</button>
+
+<h3>Output:</h3>
+<pre id="output"></pre>
+
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
