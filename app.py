@@ -2,6 +2,8 @@ from flask import Flask, request, jsonify, render_template
 import subprocess
 import tempfile
 import os
+from execution.runner import run_code
+
 
 app = Flask(__name__)
 
@@ -10,33 +12,42 @@ def home():
     return render_template("index.html")
 
 @app.route("/run", methods=["POST"])
-def run_code():
-    code = request.json.get("code")
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".py") as temp:
-        temp.write(code.encode())
-        temp_path = temp.name
+def execute():
+    data = request.json
+    code = data.get("code", "")
+    user_input = data.get("input", "")
 
-    try:
-        result = subprocess.run(
-            ["python", temp_path],
-            capture_output=True,
-            text=True,
-            timeout=5
-        )
+    result = run_code(code, user_input)
+    return jsonify(result)
 
-        output = result.stdout
-        error = result.stderr
+# Duplicate code is here. REMOVED - DO NOT ADD THIS AGAIN YOU IDIOT
+# def run_code():
+#     code = request.json.get("code")
+#     with tempfile.NamedTemporaryFile(delete=False, suffix=".py") as temp:
+#         temp.write(code.encode())
+#         temp_path = temp.name
 
-        return jsonify({
-            "output": output,
-            "error": error
-        })
+#     try:
+#         result = subprocess.run(
+#             ["python", temp_path],
+#             capture_output=True,
+#             text=True,
+#             timeout=5
+#         )
 
-    except subprocess.TimeoutExpired:
-        return jsonify({"error": "Execution timed out."})
+#         output = result.stdout
+#         error = result.stderr
 
-    finally:
-        os.remove(temp_path)
+#         return jsonify({
+#             "output": output,
+#             "error": error
+#         })
+
+#     except subprocess.TimeoutExpired:
+#         return jsonify({"error": "Execution timed out."})
+
+#     finally:
+#         os.remove(temp_path)
 
 if __name__ == "__main__":
     app.run(debug=True)
