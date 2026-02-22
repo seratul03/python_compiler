@@ -5,6 +5,14 @@ import shutil
 import sys
 import uuid
 import threading
+from compiler.lexer import tokenize
+from compiler.parser import Parser
+from compiler.bytecode import BytecodeGenerator
+from compiler.vm import VirtualMachine
+from compiler.semantic import SemanticAnalyzer
+from compiler.optimizer import Optimizer
+from compiler.ir import IRGenerator
+from compiler.ir_to_bytecode import IRToBytecodeConverter
 
 active_processes = {}
 
@@ -90,3 +98,25 @@ def cleanup(pid):
 
         shutil.rmtree(temp_dir, ignore_errors=True)
         del active_processes[pid]
+
+def run_with_compiler(code):
+    tokens = tokenize(code)
+    parser = Parser(tokens)
+    ast = parser.parse()
+
+    analyzer = SemanticAnalyzer()
+    analyzer.visit(ast)
+
+    optimizer = Optimizer()
+    ast = optimizer.visit(ast)
+
+    # Generate IR
+    ir_gen = IRGenerator()
+    ir_code = ir_gen.generate(ast)
+
+    # Convert IR → Bytecode
+    converter = IRToBytecodeConverter(ir_code)
+    instructions = converter.convert()
+
+    vm = VirtualMachine(instructions)
+    return vm.run()
