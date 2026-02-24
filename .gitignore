@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+.npm
+package-lock.json
+yarn.lock
+
+# Compiler output
+dist/
+build/
+*.o
+*.a
+*.so
+*.dylib
+*.exe
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment variables
+.env
+.env.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# Temporary files
+tmp/
+temp/
+*.tmp

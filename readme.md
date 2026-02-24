@@ -1,7 +1,3 @@
-A friendly, focused README for this repository.
-
----
-
 # 🐍 Small Python Compiler (local)
 
 Hi — this repository contains a compact, local compiler/runtime project used to experiment with parsing, IR, bytecode, and a small VM for running Python-like code.
@@ -65,7 +61,7 @@ python -c "import compiler.lexer as L; print('Lexer loaded', L)"
 
 ```powershell
 python app.py
-# then open http://127.0.0.1:5000/ if the app serves a UI
+# then open http://127.0.0.1:5000/ for accessing the UI
 ```
 
 ---
