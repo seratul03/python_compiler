@@ -5,30 +5,27 @@ class Optimizer:
             return method(node)
         return node
 
-    # ---------------- Program ---------------- #
-
     def visit_Program(self, node):
         new_statements = []
         for stmt in node.statements:
             optimized = self.visit(stmt)
-            if optimized is not None:
+            if optimized is None:
+                continue
+            if isinstance(optimized, list):
+                new_statements.extend(optimized)
+            else:
                 new_statements.append(optimized)
         node.statements = new_statements
         return node
-
-    # ---------------- Assignment ---------------- #
 
     def visit_Assignment(self, node):
         node.value = self.visit(node.value)
         return node
 
-    # ---------------- BinaryOp (Constant Folding) ---------------- #
-
     def visit_BinaryOp(self, node):
         node.left = self.visit(node.left)
         node.right = self.visit(node.right)
 
-        # If both sides are constants, compute at compile time
         if type(node.left).__name__ == "Number" and type(node.right).__name__ == "Number":
             left = node.left.value
             right = node.right.value
@@ -42,40 +39,43 @@ class Optimizer:
             elif node.operator == "/":
                 return type(node.left)(left / right)
 
-        return node
+        if type(node.right).__name__ == "Number":
+            if node.operator == "+" and node.right.value == 0:
+                return node.left
+            if node.operator == "*" and node.right.value == 1:
+                return node.left
 
-    # ---------------- Compare ---------------- #
+        if type(node.left).__name__ == "Number":
+            if node.operator == "+" and node.left.value == 0:
+                return node.right
+            if node.operator == "*" and node.left.value == 1:
+                return node.right
+
+        return node
 
     def visit_Compare(self, node):
         node.left = self.visit(node.left)
         node.right = self.visit(node.right)
         return node
 
-    # ---------------- If (Dead Code Elimination) ---------------- #
-
     def visit_IfStatement(self, node):
         node.condition = self.visit(node.condition)
 
-        # If condition is constant
         if type(node.condition).__name__ == "Number":
             if node.condition.value:
-                return node.body
+                return [self.visit(stmt) for stmt in node.body]
             else:
-                return node.else_body
+                return [self.visit(stmt) for stmt in node.else_body]
 
-        node.body = [self.visit(stmt) for stmt in node.body]
-        node.else_body = [self.visit(stmt) for stmt in node.else_body]
+        node.body = [self.visit(stmt) for stmt in node.body if stmt is not None]
+        node.else_body = [self.visit(stmt) for stmt in node.else_body if stmt is not None]
 
         return node
-
-    # ---------------- While ---------------- #
 
     def visit_WhileLoop(self, node):
         node.condition = self.visit(node.condition)
-        node.body = [self.visit(stmt) for stmt in node.body]
+        node.body = [self.visit(stmt) for stmt in node.body if stmt is not None]
         return node
-
-    # ---------------- Function ---------------- #
 
     def visit_FunctionDef(self, node):
         new_body = []
@@ -83,9 +83,12 @@ class Optimizer:
             optimized = self.visit(stmt)
             if optimized is None:
                 continue
-            new_body.append(optimized)
 
-            # Remove unreachable after return
+            if isinstance(optimized, list):
+                new_body.extend(optimized)
+            else:
+                new_body.append(optimized)
+
             if type(stmt).__name__ == "Return":
                 break
 
