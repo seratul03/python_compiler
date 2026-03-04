@@ -99,24 +99,28 @@ def cleanup(pid):
         shutil.rmtree(temp_dir, ignore_errors=True)
         del active_processes[pid]
 
-def run_with_compiler(code):
+def run_with_compiler(code, debug=False):
     tokens = tokenize(code)
     parser = Parser(tokens)
     ast = parser.parse()
-
     analyzer = SemanticAnalyzer()
     analyzer.visit(ast)
-
     optimizer = Optimizer()
     ast = optimizer.visit(ast)
-
-    # Generate IR
     ir_gen = IRGenerator()
     ir_code = ir_gen.generate(ast)
-
-    # Convert IR → Bytecode
     converter = IRToBytecodeConverter(ir_code)
     instructions = converter.convert()
-
     vm = VirtualMachine(instructions)
-    return vm.run()
+    output = vm.run()
+
+    if debug:
+        return {
+            "tokens": tokens,
+            "ast": str(ast),
+            "ir": ir_code,
+            "bytecode": instructions,
+            "output": output
+        }
+
+    return {"output": output}

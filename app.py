@@ -4,6 +4,7 @@ import tempfile
 import os
 from execution.runner import cleanup
 from execution.runner import start_process, send_input, read_output
+from execution.runner import run_with_compiler
 
 
 app = Flask(__name__)
@@ -15,8 +16,18 @@ def home():
 @app.route("/run", methods=["POST"])
 def run():
     code = request.json.get("code")
-    pid = start_process(code)
-    return jsonify({"pid": pid})
+
+    try:
+        result = run_with_compiler(code)
+
+        return jsonify({
+            "output": result["output"]
+        })
+
+    except Exception as e:
+        return jsonify({
+            "error": str(e)
+        })
 
 
 @app.route("/input", methods=["POST"])
