@@ -133,3 +133,94 @@ class IRGenerator:
         self.instructions.append(
             IRInstruction("LABEL", end_label)
         )
+
+    def visit_Return(self, node):
+        value = self.generate(node.value)
+        self.instructions.append(
+            IRInstruction("RETURN", value)
+        )
+
+    def visit_FunctionCall(self, node):
+        args = []
+
+        for arg in node.args:
+            args.append(self.generate(arg))
+
+        temp = self.new_temp()
+
+        self.instructions.append(
+            IRInstruction("CALL", node.name, args, temp)
+        )
+
+        return temp
+
+    def visit_ListLiteral(self, node):
+        elements = [self.generate(e) for e in node.elements]
+
+        temp = self.new_temp()
+
+        self.instructions.append(
+            IRInstruction("LIST", elements, None, temp)
+        )
+
+        return temp
+
+    def visit_ListAccess(self, node):
+        index = self.generate(node.index)
+
+        temp = self.new_temp()
+
+        self.instructions.append(
+            IRInstruction("INDEX", node.name, index, temp)
+        )
+
+        return temp
+
+    def visit_ForLoop(self, node):
+
+        start = self.generate(node.start)
+        end = self.generate(node.end)
+
+        loop_var = node.var_name
+
+        start_label = self.new_label()
+        end_label = self.new_label()
+
+        self.instructions.append(
+            IRInstruction("ASSIGN", start, None, loop_var)
+        )
+
+        self.instructions.append(
+            IRInstruction("LABEL", start_label)
+        )
+
+        cond_temp = self.new_temp()
+
+        self.instructions.append(
+            IRInstruction("<", loop_var, end, cond_temp)
+        )
+
+        self.instructions.append(
+            IRInstruction("JUMP_IF_FALSE", end_label, cond_temp)
+        )
+
+        for stmt in node.body:
+            self.generate(stmt)
+
+        inc_temp = self.new_temp()
+
+        self.instructions.append(
+            IRInstruction("+", loop_var, 1, inc_temp)
+        )
+
+        self.instructions.append(
+            IRInstruction("ASSIGN", inc_temp, None, loop_var)
+        )
+
+        self.instructions.append(
+            IRInstruction("JUMP", start_label)
+        )
+
+        self.instructions.append(
+            IRInstruction("LABEL", end_label)
+        )
