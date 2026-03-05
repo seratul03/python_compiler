@@ -2,27 +2,27 @@ import re
 
 TOKEN_SPEC = [
     ("SKIP",         r"[ \t]+"),
-    ("FLOAT",        r"\d+\.\d+"),          # must be before NUMBER
+    ("FLOAT",        r"\d+\.\d+"),         
     ("NUMBER",       r"\d+"),
-    ("STRING",       r'"[^"]*"|\'[^\']*\''), # single or double quotes
+    ("STRING",       r'"[^"]*"|\'[^\']*\''), 
     ("EQ",           r"=="),
     ("NEQ",          r"!="),
     ("LE",           r"<="),
     ("GE",           r">="),
-    ("POW_ASSIGN",   r"\*\*="),             # **= before ** and *=
-    ("POW",          r"\*\*"),              # must be before MULT
-    ("MULT_ASSIGN",  r"\*="),               # *= before *
+    ("POW_ASSIGN",   r"\*\*="),           
+    ("POW",          r"\*\*"),            
+    ("MULT_ASSIGN",  r"\*="),            
     ("LT",           r"<"),
     ("GT",           r">"),
     ("IDENT",        r"[a-zA-Z_][a-zA-Z0-9_]*"),
-    ("PLUS_ASSIGN",  r"\+="),               # += before +
+    ("PLUS_ASSIGN",  r"\+="),
     ("PLUS",         r"\+"),
-    ("MINUS_ASSIGN", r"-="),                # -= before -
+    ("MINUS_ASSIGN", r"-="),             
     ("MINUS",        r"-"),
     ("MULT",         r"\*"),
-    ("DIV_ASSIGN",   r"/="),                # /= before /
+    ("DIV_ASSIGN",   r"/="),               
     ("DIV",          r"/"),
-    ("MOD_ASSIGN",   r"%="),                # %= before %
+    ("MOD_ASSIGN",   r"%="),                
     ("MOD",          r"%"),
     ("ASSIGN",       r"="),
     ("LPAREN",       r"\("),
@@ -93,8 +93,6 @@ def tokenize(code):
     lines = code.split("\n")
 
     for line_num, line in enumerate(lines, start=1):
-
-        # strip inline comments
         if "#" in line:
             in_string = False
             quote_char = None
@@ -148,7 +146,6 @@ def tokenize(code):
                 tokens.append(Token("NUMBER", int(value), line_num, pos))
 
             elif kind == "STRING":
-                # strip surrounding quotes (handles both ' and ")
                 tokens.append(Token("STRING", value[1:-1], line_num, pos))
 
             elif kind == "IDENT" and value in KEYWORDS:

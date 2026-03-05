@@ -19,7 +19,7 @@ class String(ASTNode):
 
 class BoolLiteral(ASTNode):
     def __init__(self, value):
-        self.value = value   # True or False
+        self.value = value
 
 
 class NoneLiteral(ASTNode):
@@ -40,14 +40,14 @@ class BinaryOp(ASTNode):
 
 class UnaryOp(ASTNode):
     def __init__(self, operator, operand):
-        self.operator = operator   # '-' or 'not'
+        self.operator = operator 
         self.operand = operand
 
 
 class BoolOp(ASTNode):
     """and / or"""
     def __init__(self, operator, left, right):
-        self.operator = operator   # 'and' or 'or'
+        self.operator = operator 
         self.left = left
         self.right = right
 
@@ -61,13 +61,13 @@ class Assignment(ASTNode):
 class AttributeAssignment(ASTNode):
     """obj.attr = value"""
     def __init__(self, obj, attr, value):
-        self.obj = obj      # variable name (str)
-        self.attr = attr    # attribute name (str)
-        self.value = value  # ASTNode
+        self.obj = obj     
+        self.attr = attr   
+        self.value = value
 
 
 class Print(ASTNode):
-    def __init__(self, values):    # list of ASTNodes
+    def __init__(self, values):
         self.values = values
 
 
@@ -125,8 +125,6 @@ class ListAccess(ASTNode):
         self.name = name
         self.index = index
 
-
-# Legacy for-range loop (kept for backward compat)
 class ForLoop(ASTNode):
     def __init__(self, var_name, start, end, body):
         self.var_name = var_name
@@ -146,9 +144,9 @@ class ForInLoop(ASTNode):
 class RangeExpr(ASTNode):
     """range(start, stop[, step])"""
     def __init__(self, start, stop, step):
-        self.start = start    # ASTNode
-        self.stop = stop      # ASTNode
-        self.step = step      # ASTNode or None
+        self.start = start    
+        self.stop = stop      
+        self.step = step     
 
 
 class ListComprehension(ASTNode):
@@ -170,20 +168,20 @@ class IndexAssignment(ASTNode):
 class ClassDef(ASTNode):
     def __init__(self, name, parent, body):
         self.name = name
-        self.parent = parent   # str or None
+        self.parent = parent   
         self.body = body
 
 
 class AttributeAccess(ASTNode):
     def __init__(self, obj, attr):
-        self.obj = obj    # variable name (str)
-        self.attr = attr  # attribute name (str)
+        self.obj = obj    
+        self.attr = attr  
 
 
 class MethodCall(ASTNode):
     def __init__(self, obj, method, args):
-        self.obj = obj        # variable name (str)
-        self.method = method  # method name (str)
+        self.obj = obj       
+        self.method = method 
         self.args = args
 
 
@@ -197,9 +195,9 @@ class SuperMethodCall(ASTNode):
 class MethodCallExpr(ASTNode):
     """method call on an arbitrary expression (not just a variable name)"""
     def __init__(self, obj_expr, method, args):
-        self.obj_expr = obj_expr  # ASTNode
-        self.method = method       # str
-        self.args = args           # list of ASTNodes
+        self.obj_expr = obj_expr  
+        self.method = method
+        self.args = args           
 
 
 class AttributeAccessExpr(ASTNode):
@@ -237,9 +235,9 @@ class ExprStatement(ASTNode):
 class AugmentedAssignment(ASTNode):
     """name op= value  (e.g. x += 1)"""
     def __init__(self, name, operator, value):
-        self.name = name        # str variable name
-        self.operator = operator  # '+', '-', '*', '/', '%', '**'
-        self.value = value      # ASTNode
+        self.name = name        
+        self.operator = operator
+        self.value = value 
 
 
 class AttributeAugAssignment(ASTNode):

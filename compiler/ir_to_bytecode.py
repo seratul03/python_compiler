@@ -15,31 +15,29 @@ class IRToBytecodeConverter:
             if instr.op == "LABEL":
                 self.labels[instr.arg1] = position
             elif instr.op == "CONST":
-                position += 2   # LOAD_CONST + STORE_VAR
+                position += 2  
             elif instr.op == "ASSIGN":
-                position += 2   # LOAD_VAR + STORE_VAR
+                position += 2 
             elif instr.op in ("+", "-", "*", "/"):
-                position += 4   # LOAD_VAR + LOAD_VAR + OP + STORE_VAR
+                position += 4  
             elif instr.op in ("<", ">", "==", "!=", "<=", ">="):
-                position += 4   # LOAD_VAR + LOAD_VAR + COMPARE + STORE_VAR
+                position += 4  
             elif instr.op == "PRINT":
-                position += 2   # LOAD_VAR + PRINT
+                position += 2   
             elif instr.op == "JUMP":
                 position += 1
             elif instr.op == "JUMP_IF_FALSE":
-                position += 2   # LOAD_VAR + JUMP_IF_FALSE
+                position += 2  
             elif instr.op == "RETURN":
-                position += 2   # LOAD_VAR + RETURN_VALUE
+                position += 2   
             elif instr.op == "CALL":
-                # LOAD_VAR × n_args + CALL_FUNCTION + STORE_VAR
                 n_args = len(instr.arg2) if isinstance(instr.arg2, list) else 0
                 position += n_args + 2
             elif instr.op == "LIST":
-                # LOAD_VAR × n_elements + BUILD_LIST + STORE_VAR
                 n_elems = len(instr.arg1) if isinstance(instr.arg1, list) else 0
                 position += n_elems + 2
             elif instr.op == "INDEX":
-                position += 4   # LOAD_VAR name + LOAD_VAR index + LOAD_INDEX + STORE_VAR
+                position += 4  
             else:
                 position += 1
 

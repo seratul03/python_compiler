@@ -58,12 +58,11 @@ class VirtualMachine:
             return False
         if name == "None":
             return None
-        # user-defined function reference (for map / higher-order use)
         if name in self.functions:
-            return name   # return function name as a string handle
+            return name 
         if name in self.classes:
             return name
-        return 0   # default (matches old behaviour)
+        return 0  
 
     def _compile_body(self, stmts):
         """Compile a list of AST statements to instructions."""
@@ -71,7 +70,6 @@ class VirtualMachine:
         from compiler.ast_nodes import Program
         gen = BytecodeGenerator()
         instrs = gen.generate(Program(stmts))
-        # Ensure there is always an implicit return None at the end
         if not instrs or instrs[-1].opcode != "RETURN_VALUE":
             from compiler.bytecode import Instruction
             instrs.append(Instruction("LOAD_CONST", None))
@@ -140,7 +138,7 @@ class VirtualMachine:
         self.frames.append(new_frame)
         self.call_stack.append((self.instructions, ip + 1))
         self.instructions = method_instructions
-        return -1  # ip → 0 after ip += 1
+        return -1 
 
     def _call_function(self, func_name, args, ip):
         func = self.functions[func_name]
@@ -150,11 +148,7 @@ class VirtualMachine:
         self.frames.append(new_frame)
         self.call_stack.append((self.instructions, ip + 1))
         self.instructions = func["instructions"]
-        return -1  # ip → 0 after ip += 1
-
-    # ------------------------------------------------------------------ #
-    # Main run loop
-    # ------------------------------------------------------------------ #
+        return -1 
 
     def run(self):
         ip = 0
@@ -162,8 +156,6 @@ class VirtualMachine:
         while ip < len(self.instructions):
             instr = self.instructions[ip]
             op    = instr.opcode
-
-            # -------- LOAD / STORE -------- #
 
             if op == "LOAD_CONST":
                 self.stack.append(instr.argument)
@@ -173,8 +165,6 @@ class VirtualMachine:
 
             elif op == "STORE_VAR":
                 self.current_frame().variables[instr.argument] = self.stack.pop()
-
-            # -------- LISTS -------- #
 
             elif op == "BUILD_LIST":
                 count = instr.argument
@@ -190,7 +180,6 @@ class VirtualMachine:
                     raise ValueError(
                         f"not enough values to unpack (expected {n}, got {len(items)})"
                     )
-                # Push in reverse so first STORE_VAR gets first element
                 for item in reversed(items):
                     self.stack.append(item)
 
@@ -198,8 +187,7 @@ class VirtualMachine:
                 value = self.stack.pop()
                 lst   = self.stack.pop()
                 lst.append(value)
-                # list lives by reference — no need to push back
-
+               
             elif op == "LOAD_INDEX":
                 index = self.stack.pop()
                 lst   = self.stack.pop()
@@ -215,15 +203,11 @@ class VirtualMachine:
                 if self.stack:
                     self.stack.pop()
 
-            # -------- PRINT -------- #
-
             elif op == "PRINT":
                 count  = instr.argument if instr.argument is not None else 1
                 values = [self.stack.pop() for _ in range(count)]
                 values.reverse()
                 self.output.append(" ".join(self._fmt(v) for v in values))
-
-            # -------- ARITHMETIC -------- #
 
             elif op in ("ADD", "SUB", "MUL", "DIV", "MOD", "POW"):
                 b = self.stack.pop()
@@ -242,8 +226,6 @@ class VirtualMachine:
                     result = a ** b
                 self.stack.append(result)
 
-            # -------- UNARY -------- #
-
             elif op == "UNARY_NEG":
                 self.stack.append(-self.stack.pop())
 
@@ -259,8 +241,6 @@ class VirtualMachine:
                 b = self.stack.pop()
                 a = self.stack.pop()
                 self.stack.append(a or b)
-
-            # -------- COMPARISON -------- #
 
             elif op == "COMPARE":
                 b = self.stack.pop()
@@ -288,9 +268,6 @@ class VirtualMachine:
                     self.stack.append(a not in b)
                 else:
                     self.stack.append(False)
-
-            # -------- CONTROL FLOW -------- #
-
             elif op == "JUMP_IF_FALSE":
                 if not self.stack.pop():
                     ip = instr.argument
@@ -299,18 +276,12 @@ class VirtualMachine:
             elif op == "JUMP":
                 ip = instr.argument
                 continue
-
-            # -------- FUNCTION DEFINITION -------- #
-
             elif op == "DEFINE_FUNCTION":
                 func_node = instr.argument
                 self.functions[func_node.name] = {
                     "params":       func_node.params,
                     "instructions": self._compile_body(func_node.body),
                 }
-
-            # -------- FUNCTION CALL -------- #
-
             elif op == "CALL_FUNCTION":
                 name, arg_count = instr.argument
                 args = [self.stack.pop() for _ in range(arg_count)]
@@ -319,40 +290,28 @@ class VirtualMachine:
                 if ip == -1:
                     ip = 0
                     continue
-                # ip was set to a real value → skip the ip += 1 below
                 else:
                     ip += 1
                     continue
-
-            # -------- RETURN -------- #
-
             elif op == "RETURN_VALUE":
                 return_value = self.stack.pop() if self.stack else None
                 self.frames.pop()
                 if self.call_stack:
                     self.instructions, ip = self.call_stack.pop()
-                    ip -= 1   # ip += 1 at end of loop moves it right
+                    ip -= 1  
                 else:
-                    # top-level return — end execution
                     self.stack.append(return_value)
                     break
                 self.stack.append(return_value)
-
-            # -------- CLASS DEFINITION -------- #
-
             elif op == "DEFINE_CLASS":
                 class_node = instr.argument
                 self.classes[class_node.name] = class_node
-
-            # -------- ATTRIBUTE ACCESS -------- #
-
             elif op == "LOAD_ATTR":
                 attr = instr.argument
                 obj  = self.stack.pop()
                 if isinstance(obj, dict) and "__attributes__" in obj:
                     self.stack.append(obj["__attributes__"].get(attr))
                 else:
-                    # strings, lists, or Python objects
                     self.stack.append(getattr(obj, attr, None))
 
             elif op == "STORE_ATTR":
@@ -363,16 +322,12 @@ class VirtualMachine:
                     obj["__attributes__"][attr] = value
                 else:
                     setattr(obj, attr, value)
-
-            # -------- METHOD CALL -------- #
-
             elif op == "CALL_METHOD":
                 method_name, arg_count = instr.argument
                 args = [self.stack.pop() for _ in range(arg_count)]
                 args.reverse()
                 obj  = self.stack.pop()
 
-                # --- built-in string methods ---
                 if isinstance(obj, str):
                     m = getattr(str, method_name, None)
                     if m is None:
@@ -382,18 +337,15 @@ class VirtualMachine:
                     ip += 1
                     continue
 
-                # --- built-in list methods ---
                 if isinstance(obj, list):
                     m = getattr(list, method_name, None)
                     if m is None:
                         raise AttributeError(f"list has no method '{method_name}'")
                     result = getattr(obj, method_name)(*args)
-                    # methods like append/sort/reverse return None but mutate
                     self.stack.append(result if result is not None else None)
                     ip += 1
                     continue
 
-                # --- class instance method ---
                 if not (isinstance(obj, dict) and "__class__" in obj):
                     raise TypeError(
                         f"Cannot call method '{method_name}' on {type(obj).__name__}"
@@ -406,9 +358,6 @@ class VirtualMachine:
                 ip = self._call_method_node(method_node, obj, args, ip)
                 ip = 0
                 continue
-
-            # -------- SUPER METHOD CALL -------- #
-
             elif op == "CALL_SUPER_METHOD":
                 method_name, arg_count = instr.argument
                 args = [self.stack.pop() for _ in range(arg_count)]
@@ -433,10 +382,6 @@ class VirtualMachine:
 
         return "\n".join(str(x) for x in self.output)
 
-    # ------------------------------------------------------------------ #
-    # Built-in dispatch
-    # ------------------------------------------------------------------ #
-
     def _dispatch_call(self, name, args, ip):
         """
         Handle all built-in functions.
@@ -446,9 +391,7 @@ class VirtualMachine:
         This method pushes a result onto self.stack in the built-in case.
         """
 
-        # --- simple type coercions ---
         if name == "str":
-            # Honour __str__ on class instances
             obj = args[0] if args else ""
             if isinstance(obj, dict) and "__class__" in obj:
                 self.stack.append(self._instance_str(obj) or str(obj))
@@ -459,7 +402,7 @@ class VirtualMachine:
         if name in ("int", "float", "bool", "abs", "round"):
             fn = _BUILTIN_CALLABLES[name]
             self.stack.append(fn(*args))
-            return ip   # caller does ip += 1
+            return ip
 
         if name == "len":
             self.stack.append(len(args[0]))
@@ -524,7 +467,6 @@ class VirtualMachine:
                 if callable(fn_ref):
                     result.append(fn_ref(item))
                 elif isinstance(fn_ref, str) and fn_ref in self.functions:
-                    # user-defined function name
                     func = self.functions[fn_ref]
                     tmp_frame = Frame()
                     for param, val in zip(func["params"], [item]):
@@ -609,7 +551,6 @@ class VirtualMachine:
             self.stack.append(None)
             return ip
 
-        # --- class constructor ---
         if name in self.classes:
             instance = {"__class__": name, "__attributes__": {}}
             init_node, _ = self._find_method(name, "__init__")
@@ -620,7 +561,6 @@ class VirtualMachine:
                 new_frame.variables["__current_class__"] = name
                 for param, val in zip(init_node.params[1:], args):
                     new_frame.variables[param] = val
-                # Run __init__ with a sub-VM (constructor always returns self)
                 sub_vm = VirtualMachine(init_instrs)
                 sub_vm.frames   = [new_frame]
                 sub_vm.functions = self.functions
@@ -631,9 +571,8 @@ class VirtualMachine:
             self.stack.append(instance)
             return ip
 
-        # --- user-defined function (instruction-switch) ---
         if name in self.functions:
             ip = self._call_function(name, args, ip)
-            return ip   # -1  → caller handles
-
+            return ip  
+        
         raise NameError(f"Unknown function or class: '{name}'")

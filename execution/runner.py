@@ -236,11 +236,6 @@ def reset_runtime():
 
     active_processes = {}
 
-
-# ==============================
-# Compiler execution pipeline
-# ==============================
-
 def run_with_compiler(code, debug=False):
 
     try:
@@ -255,11 +250,10 @@ def run_with_compiler(code, debug=False):
         optimizer = Optimizer()
         ast = optimizer.visit(ast)
 
-        # Use BytecodeGenerator directly — supports all language features
         from compiler.bytecode import BytecodeGenerator
         gen = BytecodeGenerator()
         instructions = gen.generate(ast)
-        original_instructions = list(instructions)  # snapshot for debug
+        original_instructions = list(instructions) 
 
         vm = VirtualMachine(instructions)
         inputs = code.split("__INPUT__")
@@ -274,7 +268,6 @@ def run_with_compiler(code, debug=False):
         output = vm.run()
 
     except Exception as compiler_error:
-        # fallback to safe python execution
         return safe_exec(code)
 
     if debug:

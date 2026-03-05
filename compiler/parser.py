@@ -356,18 +356,7 @@ class Parser:
         self.eat("DEDENT")
         return statements
 
-    # ------------------------------------------------------------------ #
-    # Expressions — precedence ladder (low → high)
-    #   bool_expr  :  comparison (and|or comparison)*
-    #   comparison :  expression (op expression)?
-    #   expression :  term ((+|-) term)*
-    #   term       :  power ((*|/|%) power)*
-    #   power      :  unary (** unary)*
-    #   unary      :  (- | not) unary  |  factor
-    #   factor     :  NUMBER | FLOAT | STRING | TRUE | FALSE | NONE |
-    #                 LPAREN expr RPAREN | list | list-comp | call | attr | var
-    # ------------------------------------------------------------------ #
-
+    
     def bool_expr(self):
         left = self.comparison()
         while self.current() and self.current().type in ("AND", "OR"):
@@ -378,7 +367,6 @@ class Parser:
 
     def comparison(self):
         left = self.expression()
-        # Handle 'not in' compound operator
         if self.current() and self.current().type == "NOT":
             saved_pos = self.pos
             self.eat("NOT")
@@ -386,9 +374,7 @@ class Parser:
                 self.eat("IN")
                 right = self.expression()
                 return Compare(left, "not in", right)
-            # Not 'not in' — restore position and fall through
             self.pos = saved_pos
-        # Handle 'is not' compound operator
         if self.current() and self.current().type == "IS":
             self.eat("IS")
             if self.current() and self.current().type == "NOT":
@@ -443,11 +429,10 @@ class Parser:
     def factor(self):
         """Parse a primary expression and handle any trailing DOT-chains or subscripts."""
         node = self._primary()
-        # Post-factor chaining: DOT or LBRACKET after any expression
         while self.current() and self.current().type in ("DOT", "LBRACKET"):
             if self.current().type == "DOT":
                 node = self._parse_dot_chain(node)
-            else:  # LBRACKET
+            else:
                 self.eat("LBRACKET")
                 index = self.bool_expr()
                 self.eat("RBRACKET")
@@ -462,8 +447,7 @@ class Parser:
 
         if token is None:
             raise Exception("Unexpected end of input in expression")
-
-        # --- literals ---
+        
         if token.type == "NUMBER":
             return Number(self.eat("NUMBER").value)
 
@@ -485,18 +469,15 @@ class Parser:
             self.eat("NONE")
             return NoneLiteral()
 
-        # --- parenthesised expression ---
         if token.type == "LPAREN":
             self.eat("LPAREN")
             expr = self.bool_expr()
             self.eat("RPAREN")
             return expr
 
-        # --- list literal / list comprehension ---
         if token.type == "LBRACKET":
             return self._parse_list_or_comp()
 
-        # --- IDENT-led expressions ---
         if token.type == "IDENT":
             return self._parse_ident_expr()
 
@@ -504,21 +485,15 @@ class Parser:
             f"Invalid expression token: {token.type}={token.value!r} at line {token.line}"
         )
 
-    # ------------------------------------------------------------------ #
-    # List literal or list comprehension  [ ... ]
-    # ------------------------------------------------------------------ #
-
     def _parse_list_or_comp(self):
         self.eat("LBRACKET")
 
-        # empty list
         if self.current() and self.current().type == "RBRACKET":
             self.eat("RBRACKET")
             return ListLiteral([])
 
         first_expr = self.bool_expr()
 
-        # list comprehension: [expr for var in iterable [if cond]]
         if self.current() and self.current().type == "FOR":
             self.eat("FOR")
             var_name = self.eat("IDENT").value
@@ -531,7 +506,6 @@ class Parser:
             self.eat("RBRACKET")
             return ListComprehension(first_expr, var_name, iterable, condition)
 
-        # regular list
         elements = [first_expr]
         while self.current() and self.current().type == "COMMA":
             self.eat("COMMA")
@@ -562,14 +536,10 @@ class Parser:
             return expr
         return self.bool_expr()
 
-    # ------------------------------------------------------------------ #
-    # IDENT-led expressions  (variable, call, attr, method, subscript)
-    # ------------------------------------------------------------------ #
-
     def _parse_ident_expr(self):
         name = self.eat("IDENT").value
 
-        # super().method(args)
+
         if name == "super" and self.current() and self.current().type == "LPAREN":
             self.eat("LPAREN")
             self.eat("RPAREN")
@@ -580,25 +550,21 @@ class Parser:
             self.eat("RPAREN")
             return SuperMethodCall(method, args)
 
-        # function call: name(args)
         if self.current() and self.current().type == "LPAREN":
             self.eat("LPAREN")
             args = self._arg_list()
             self.eat("RPAREN")
             node = FunctionCall(name, args)
-            # allow chained call: func().method(...)
             if self.current() and self.current().type == "DOT":
                 return self._parse_dot_chain(node)
             return node
-
-        # subscript: name[index]
+        
         if self.current() and self.current().type == "LBRACKET":
             self.eat("LBRACKET")
             index = self.bool_expr()
             self.eat("RBRACKET")
             return ListAccess(name, index)
-
-        # attribute / method chain: name.attr  or  name.method(args)
+        
         if self.current() and self.current().type == "DOT":
             return self._parse_dot_chain(Variable(name))
 
@@ -626,10 +592,6 @@ class Parser:
         if isinstance(obj_node, Variable):
             return AttributeAccess(obj_node.name, attr)
         return AttributeAccessExpr(obj_node, attr)
-
-    # ------------------------------------------------------------------ #
-    # Helpers
-    # ------------------------------------------------------------------ #
 
     def _arg_list(self):
         args = []

@@ -514,7 +514,7 @@ class BytecodeGenerator:
 
     def visit_MethodCallExpr(self, node):
         """Method call on an arbitrary expression (string literal, call result, etc.)"""
-        self.generate(node.obj_expr)   # push the object
+        self.generate(node.obj_expr)   
         for arg in node.args:
             self.generate(arg)
         self.instructions.append(

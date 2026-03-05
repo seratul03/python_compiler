@@ -148,10 +148,6 @@ class SemanticAnalyzer:
         if not self._in_loop:
             raise SemanticError("'continue' outside loop")
 
-    # ------------------------------------------------------------------ #
-    # For loops
-    # ------------------------------------------------------------------ #
-
     def visit_ForLoop(self, node):
         self.visit(node.start)
         self.visit(node.end)
@@ -165,7 +161,6 @@ class SemanticAnalyzer:
 
     def visit_ForInLoop(self, node):
         self.visit(node.iterable)
-        # var_name can be a list (tuple unpacking) or a plain string
         if isinstance(node.var_name, list):
             for vn in node.var_name:
                 self.declare(vn)
@@ -183,10 +178,6 @@ class SemanticAnalyzer:
         self.visit(node.stop)
         if node.step:
             self.visit(node.step)
-
-    # ------------------------------------------------------------------ #
-    # List
-    # ------------------------------------------------------------------ #
 
     def visit_ListLiteral(self, node):
         for e in node.elements:
@@ -212,10 +203,6 @@ class SemanticAnalyzer:
             self.visit(node.condition)
         self.exit_scope()
 
-    # ------------------------------------------------------------------ #
-    # Augmented assignments
-    # ------------------------------------------------------------------ #
-
     def visit_AugmentedAssignment(self, node):
         if not self.is_declared(node.name):
             raise SemanticError(f"Variable '{node.name}' is not defined")
@@ -233,10 +220,6 @@ class SemanticAnalyzer:
     def visit_ExprStatement(self, node):
         self.visit(node.expr)
 
-    # ------------------------------------------------------------------ #
-    # Functions
-    # ------------------------------------------------------------------ #
-
     def visit_FunctionDef(self, node):
         self.functions[node.name] = len(node.params)
         self.declare(node.name)
@@ -251,7 +234,6 @@ class SemanticAnalyzer:
         self.exit_scope()
 
     def visit_FunctionCall(self, node):
-        # Always allow built-ins and class constructors
         if node.name not in BUILTIN_NAMES and node.name not in self.classes:
             if node.name not in self.functions and not self.is_declared(node.name):
                 raise SemanticError(f"Function or class '{node.name}' is not defined")
@@ -259,12 +241,7 @@ class SemanticAnalyzer:
             self.visit(arg)
 
     def visit_Return(self, node):
-        # Allow returns from top-level (some scripts do it)
         self.visit(node.value)
-
-    # ------------------------------------------------------------------ #
-    # Classes
-    # ------------------------------------------------------------------ #
 
     def visit_ClassDef(self, node):
         self.classes[node.name] = node
@@ -276,7 +253,6 @@ class SemanticAnalyzer:
         self.exit_scope()
 
     def visit_AttributeAccess(self, node):
-        # obj.attr — only check obj is declared
         if not self.is_declared(node.obj):
             raise SemanticError(f"Variable '{node.obj}' is not defined")
 

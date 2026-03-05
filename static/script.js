@@ -30,7 +30,6 @@ function runCode() {
     const code = editor.getValue();
     const outputBox = outputBoxEl;
 
-    // Stop any existing session first
     stopSession();
 
     outputBox.innerText = "Running...";
@@ -82,7 +81,6 @@ function pollOutput() {
     fetch(`/output/${pid}`)
         .then(res => res.json())
         .then(data => {
-            // Guard: session may have been stopped while fetch was in-flight
             if (!currentPid) return;
 
             const outputBox = outputBoxEl;
@@ -99,14 +97,12 @@ function pollOutput() {
                 outputBox.innerText = sessionOutput;
                 outputBox.scrollTop = outputBox.scrollHeight;
                 emptyPollCount = 0;
-                // New output arrived — process is not blocked on input anymore
                 if (isWaitingForInput) {
                     hideInputRow();
                     isWaitingForInput = false;
                 }
             } else if (!data.finished) {
                 emptyPollCount++;
-                // After 5 consecutive empty polls (~750 ms), assume waiting for input
                 if (emptyPollCount >= 5 && !isWaitingForInput) {
                     showInputRow();
                 }
@@ -142,7 +138,6 @@ function submitInput() {
     const inputField = document.getElementById('user-input-field');
     const value = inputField.value;
 
-    // Echo the typed input into the output display
     sessionOutput += value + "\n";
     outputBoxEl.innerText = sessionOutput;
 

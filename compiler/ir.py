@@ -135,7 +135,6 @@ class IRGenerator:
         )
 
     def visit_FunctionDef(self, node):
-        # Store the AST node so the VM can inline it when called.
         self.instructions.append(
             IRInstruction("DEFINE_FUNCTION", node.name, node, None)
         )
@@ -223,7 +222,6 @@ class IRGenerator:
         for stmt in node.body:
             self.generate(stmt)
 
-        # Load the literal 1 into a temp so LOAD_VAR resolves correctly
         one_temp = self.new_temp()
         self.instructions.append(
             IRInstruction("CONST", 1, None, one_temp)

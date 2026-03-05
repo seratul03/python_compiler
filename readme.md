@@ -1,76 +1,129 @@
-# 🐍 Small Python Compiler (local)
+# Custom Compiler & Web IDE
 
-Hi — this repository contains a compact, local compiler/runtime project used to experiment with parsing, IR, bytecode, and a small VM for running Python-like code.
-
-It’s purpose-built for learning and local experimentation rather than production use.
+A full compilation pipeline for a Python-like language, paired with a browser-based code editor. Write code, run it, and inspect every stage of compilation — tokens, AST, control flow graph, and bytecode — all from one interface.
 
 ---
 
-## What it is
+## Features
 
-- A tiny compiler toolchain that includes a lexer, parser, IR, optimizer, bytecode generator, and a simple VM.
-- A lightweight web UI / runner for experimenting with code snippets (where present).
-
----
-
-## Tech stack
-
-- Python 3
-- Standard library + small project modules (no heavy framework required to inspect core components)
+- **Full compiler pipeline** — Lexer → Parser → Semantic Analyzer → Optimizer → Bytecode Generator → Virtual Machine
+- **Web IDE** — Monaco Editor (the same editor used in VS Code) served via Flask
+- **Debug visualizations** — view the AST, CFG, and disassembled bytecode for any program
+- **Interactive execution** — programs that call `input()` prompt a dialog in the browser
+- **AST optimizer** — constant folding, dead code elimination, branch simplification
+- **OOP support** — classes, inheritance, instance methods, and `super()`
+- **Security hardening** — blocks dangerous patterns (`import`, `open`, `eval`, `__import__`) before execution
 
 ---
 
-## Project layout
+## Compilation Pipeline
 
 ```
-.
-├── app.py                # Optional web front-end (if present)
-├── readme.md
-├── compiler/             # Compiler implementation
-│   ├── lexer.py
-│   ├── parser.py
-│   ├── ast_nodes.py
-│   ├── ir.py
-│   ├── ir_to_bytecode.py
-│   ├── bytecode.py
-│   ├── optimizer.py
-│   ├── semantic.py
-│   └── vm.py
-├── execution/            # Runner / sandbox helpers
-│   ├── runner.py
-│   └── sandbox.py
-├── templates/            # (Optional) HTML templates for the web UI
-└── static/               # (Optional) client JS/CSS
+Source Code
+    │
+    ▼
+ Lexer           →  Token stream
+    │
+    ▼
+ Parser          →  Abstract Syntax Tree 
+    │
+    ▼
+ Semantic        →  Scope checking, variable validation
+ Analyzer
+    │
+    ▼
+ Optimizer       →  Constant folding, dead code elimination
+    │
+    ▼
+ Bytecode        →  Stack machine instructions
+    │
+    ▼
+ Virtual         →  Executes bytecode; supports functions, classes,
+ Machine            built-in callables, break/continue
 ```
-
-Only files present in the repository are listed above — this README no longer references external or unrelated files.
 
 ---
 
-## Quick start
+## Getting Started
 
-Run a small example or inspect modules directly from Python.
+### Prerequisites
 
-1) From the project root, run a REPL or a simple script:
+- Python 3.10+
+- `pip`
 
-```powershell
-python -c "import compiler.lexer as L; print('Lexer loaded', L)"
+### Installation
+
+```bash
+git clone <repo-url>
+cd compiler
+pip install flask
 ```
 
-2) See there is an `app.py` web UI; start it locally:
+### Running
 
-```powershell
+```bash
 python app.py
-# then open http://127.0.0.1:5000/ for accessing the UI
 ```
 
----
-
-## Safety & scope
-
-This project runs code locally and is intended for experimentation. Do not expose it as-is to untrusted users — it lacks robust sandboxing and hard execution limits.
+Open your browser and go to `http://localhost:5000`.
 
 ---
 
-## License
-This is free to all project. You can absolutely take this code and add it in your project or anywhere. 
+## Usage
+
+1. Write code in the editor on the left.
+2. Click **Run Code** or press **Ctrl + Enter**.
+3. Use the tabs on the right to inspect results:
+
+| Tab | Contents |
+|-----|----------|
+| **Output** | Standard output from the program |
+| **AST** | Abstract Syntax Tree hierarchy |
+| **CFG** | Control Flow Graph (nodes and edges) |
+| **Bytecode** | Disassembled bytecode instructions |
+
+4. If your program calls `input()`, an input dialog will appear automatically.
+5. Click **Reset** to clear the editor and output.
+
+---
+
+## Language Reference
+
+The language is a subset of Python. Supported constructs:
+
+| Feature | Example |
+|---------|---------|
+| Variables & assignment | `x = 42` |
+| Augmented assignment | `x += 1` |
+| Arithmetic & comparison | `x * 2`, `x >= 10` |
+| Conditionals | `if / elif / else` |
+| While loops | `while x > 0:` |
+| For loops | `for i in range(10):` |
+| Break & continue | `break`, `continue` |
+| Functions | `def greet(name):` |
+| Classes & inheritance | `class Dog(Animal):` |
+| List comprehensions | `[x * 2 for x in items]` |
+| String & list methods | `.append()`, `.upper()`, etc. |
+| Built-ins | `print()`, `input()`, `range()`, `len()`, `type()` |
+
+---
+
+## API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/` | Serve the web IDE |
+| `POST` | `/run` | Compile and run code; returns output + debug info |
+| `POST` | `/start` | Start a long-running process (returns PID) |
+| `GET` | `/output/<pid>` | Poll stdout of a running process |
+| `POST` | `/input/<pid>` | Send a line of input to a running process |
+| `POST` | `/stop/<pid>` | Kill a running process |
+
+---
+
+## Dependencies
+
+| Package | Purpose |
+|---------|---------|
+| `Flask` | Web server and API |
+| `Monaco Editor` (CDN) | Browser code editor |

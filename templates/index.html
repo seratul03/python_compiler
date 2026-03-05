@@ -66,9 +66,8 @@
 
         require(["vs/editor/editor.main"], function () {
 
-            // Define a clean, formal light theme
             monaco.editor.defineTheme("formal-light", {
-                base: "vs", // 'vs' is the base light theme
+                base: "vs", 
                 inherit: true,
                 rules: [
                     { token: "comment", foreground: "008000", fontStyle: "italic" },
@@ -91,9 +90,9 @@
                 value: `print("Hello Brainware")`,
                 language: "python",
                 theme: "formal-light",
-                automaticLayout: true, // Automatically adjusts to container size
+                automaticLayout: true, 
 
-                fontSize: 14, // Slightly scaled down for a more professional feel
+                fontSize: 14, 
                 fontFamily: "'Fira Code', Consolas, monospace",
                 fontLigatures: true,
 
@@ -103,10 +102,9 @@
                 minimap: { enabled: false },
                 scrollBeyondLastLine: false,
                 wordWrap: "on",
-                padding: { top: 16, bottom: 16 } // Adds breathing room inside the editor
+                padding: { top: 16, bottom: 16 }
             });
 
-            // Ctrl + Enter to Run
             editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, function () {
                 if (typeof runCode === 'function') {
                     runCode();
