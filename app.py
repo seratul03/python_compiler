@@ -1,80 +1,64 @@
 from flask import Flask, request, jsonify, render_template
-import subprocess
-import tempfile
-import os
-from execution.runner import cleanup
-from execution.runner import start_process, send_input, read_output
-from execution.runner import run_with_compiler
-
+from execution.runner import (
+    run_with_compiler,
+    get_debug_info,
+    start_process,
+    read_output,
+    send_input,
+    cleanup,
+)
 
 app = Flask(__name__)
+
 
 @app.route("/")
 def home():
     return render_template("index.html")
 
+
 @app.route("/run", methods=["POST"])
 def run():
-    code = request.json.get("code")
+
+    data = request.json
+    code = data.get("code")
 
     try:
-        result = run_with_compiler(code)
-
-        return jsonify({
-            "output": result["output"]
-        })
+        result = run_with_compiler(code, True)
+        return jsonify(result)
 
     except Exception as e:
-        return jsonify({
-            "error": str(e)
-        })
+        return jsonify({"error": str(e)})
 
 
-@app.route("/input", methods=["POST"])
-def input_to_process():
-    pid = request.json.get("pid")
-    user_input = request.json.get("input")
-    return jsonify(send_input(pid, user_input))
+@app.route("/start", methods=["POST"])
+def start():
+    data = request.json
+    code = data.get("code", "")
+    try:
+        debug_info = get_debug_info(code)
+        pid = start_process(code)
+        return jsonify({"pid": pid, **debug_info})
+    except Exception as e:
+        return jsonify({"error": str(e)})
 
-@app.route("/output", methods=["POST"])
-def get_output():
-    pid = request.json.get("pid")
+
+@app.route("/output/<pid>", methods=["GET"])
+def get_output(pid):
     return jsonify(read_output(pid))
 
-@app.route("/reset", methods=["POST"])
-def reset():
-    pid = request.json.get("pid")
+
+@app.route("/input/<pid>", methods=["POST"])
+def give_input(pid):
+    data = request.json
+    user_input = data.get("input", "")
+    return jsonify(send_input(pid, user_input))
+
+
+@app.route("/stop/<pid>", methods=["POST"])
+def stop(pid):
     cleanup(pid)
-    return jsonify({"status": "terminated"})
+    return jsonify({"status": "stopped"})
 
-# Duplicate code is here. REMOVED - DO NOT ADD THIS AGAIN YOU IDIOT
-# def run_code():
-#     code = request.json.get("code")
-#     with tempfile.NamedTemporaryFile(delete=False, suffix=".py") as temp:
-#         temp.write(code.encode())
-#         temp_path = temp.name
-
-#     try:
-#         result = subprocess.run(
-#             ["python", temp_path],
-#             capture_output=True,
-#             text=True,
-#             timeout=5
-#         )
-
-#         output = result.stdout
-#         error = result.stderr
-
-#         return jsonify({
-#             "output": output,
-#             "error": error
-#         })
-
-#     except subprocess.TimeoutExpired:
-#         return jsonify({"error": "Execution timed out."})
-
-#     finally:
-#         os.remove(temp_path)
 
 if __name__ == "__main__":
     app.run(debug=True)

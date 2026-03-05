@@ -77,7 +77,7 @@ class IRGenerator:
 
         temp = self.new_temp()
         self.instructions.append(
-            IRInstruction("COMPARE", left, right, temp)
+            IRInstruction(node.operator, left, right, temp)
         )
         return temp
     
@@ -134,6 +134,12 @@ class IRGenerator:
             IRInstruction("LABEL", end_label)
         )
 
+    def visit_FunctionDef(self, node):
+        # Store the AST node so the VM can inline it when called.
+        self.instructions.append(
+            IRInstruction("DEFINE_FUNCTION", node.name, node, None)
+        )
+
     def visit_Return(self, node):
         value = self.generate(node.value)
         self.instructions.append(
@@ -175,6 +181,16 @@ class IRGenerator:
         )
 
         return temp
+    
+    def visit_String(self, node):
+        temp = self.new_temp()
+
+        self.instructions.append(
+        IRInstruction("CONST", node.value, None, temp)
+    )
+
+        return temp
+
 
     def visit_ForLoop(self, node):
 
@@ -207,10 +223,15 @@ class IRGenerator:
         for stmt in node.body:
             self.generate(stmt)
 
-        inc_temp = self.new_temp()
-
+        # Load the literal 1 into a temp so LOAD_VAR resolves correctly
+        one_temp = self.new_temp()
         self.instructions.append(
-            IRInstruction("+", loop_var, 1, inc_temp)
+            IRInstruction("CONST", 1, None, one_temp)
+        )
+
+        inc_temp = self.new_temp()
+        self.instructions.append(
+            IRInstruction("+", loop_var, one_temp, inc_temp)
         )
 
         self.instructions.append(

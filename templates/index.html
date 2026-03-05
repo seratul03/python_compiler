@@ -1,98 +1,122 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Python Compiler</title>
-    
+
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-    
+
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
+
 <body>
 
-<div class="app-container">
-    <header class="app-header">
-    <h2>Python Compiler</h2>
-    <div style="display:flex; gap:10px;">
-        <button type="button" class="run-btn" onclick="runCode()">
-            Run Code
-        </button>
-        <button type="button" class="run-btn" style="background:#6B7280;" onclick="resetCompiler()">
-            Reset
-        </button>
-    </div>
-</header>
+    <div class="app-container">
+        <header class="app-header">
+            <h2>Python Compiler</h2>
+            <div style="display:flex; gap:10px;">
+                <button type="button" class="run-btn" onclick="runCode()">
+                    Run Code
+                </button>
+                <button type="button" class="run-btn" style="background:#6B7280;" onclick="resetCompiler()">
+                    Reset
+                </button>
+            </div>
+        </header>
 
-    <div class="workspace">
-        <div class="editor-pane">
-            <div id="editor"></div>
+        <div class="workspace">
+            <div class="editor-pane">
+                <div id="editor"></div>
+            </div>
+
+            <div class="output-pane">
+
+                <div class="tab-bar">
+                    <button class="tab-btn active" onclick="switchTab('output')">Output</button>
+                    <button class="tab-btn" onclick="switchTab('ast')">AST</button>
+                    <button class="tab-btn" onclick="switchTab('cfg')">CFG</button>
+                    <button class="tab-btn" onclick="switchTab('bytecode')">Bytecode</button>
+                </div>
+
+                <div id="output" class="tab-content active" style="white-space: pre-wrap; font-family: monospace;"></div>
+                <div id="ast" class="tab-content" style="white-space: pre-wrap; font-family: monospace;"></div>
+                <div id="cfg" class="tab-content" style="white-space: pre-wrap; font-family: monospace;"></div>
+                <div id="bytecode" class="tab-content" style="white-space: pre-wrap; font-family: monospace;"></div>
+
+                <div id="input-row" style="display:none; padding: 8px 16px; border-top: 1px solid #E5E7EB; background: #fff; gap: 8px; align-items: center; flex-shrink: 0;">
+                    <input type="text" id="user-input-field" placeholder="Enter input..."
+                        style="flex:1; padding:6px 10px; border:1px solid #E5E7EB; border-radius:4px; font-family:monospace; font-size:0.875rem; outline:none;"
+                        onkeydown="if(event.key==='Enter') submitInput()">
+                    <button onclick="submitInput()"
+                        style="padding:6px 14px; background:#2563EB; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:0.875rem;">
+                        Send
+                    </button>
+                </div>
+
+            </div>
         </div>
-        
-        <div class="output-pane">
-    <div class="output-header">Output</div>
-    <div id="output" contenteditable="true"></div>
-</div>
-</div>
-</div>
+    </div>
 
-<script src="https://unpkg.com/monaco-editor@latest/min/vs/loader.js"></script>
+    <script src="https://unpkg.com/monaco-editor@latest/min/vs/loader.js"></script>
 
-<script>
-require.config({ paths: { vs: 'https://unpkg.com/monaco-editor@latest/min/vs' }});
+    <script>
+        require.config({ paths: { vs: 'https://unpkg.com/monaco-editor@latest/min/vs' } });
 
-require(["vs/editor/editor.main"], function () {
+        require(["vs/editor/editor.main"], function () {
 
-    // Define a clean, formal light theme
-    monaco.editor.defineTheme("formal-light", {
-        base: "vs", // 'vs' is the base light theme
-        inherit: true,
-        rules: [
-            { token: "comment", foreground: "008000", fontStyle: "italic" },
-            { token: "keyword", foreground: "0000FF" },
-            { token: "string", foreground: "A31515" },
-            { token: "number", foreground: "098658" },
-            { token: "identifier", foreground: "001080" }
-        ],
-        colors: {
-            "editor.background": "#FAFAFA",
-            "editor.lineHighlightBackground": "#F0F0F0",
-            "editorCursor.foreground": "#000000",
-            "editor.selectionBackground": "#ADD6FF",
-            "editorLineNumber.foreground": "#999999",
-            "editorLineNumber.activeForeground": "#333333"
-        }
-    });
+            // Define a clean, formal light theme
+            monaco.editor.defineTheme("formal-light", {
+                base: "vs", // 'vs' is the base light theme
+                inherit: true,
+                rules: [
+                    { token: "comment", foreground: "008000", fontStyle: "italic" },
+                    { token: "keyword", foreground: "0000FF" },
+                    { token: "string", foreground: "A31515" },
+                    { token: "number", foreground: "098658" },
+                    { token: "identifier", foreground: "001080" }
+                ],
+                colors: {
+                    "editor.background": "#FAFAFA",
+                    "editor.lineHighlightBackground": "#F0F0F0",
+                    "editorCursor.foreground": "#000000",
+                    "editor.selectionBackground": "#ADD6FF",
+                    "editorLineNumber.foreground": "#999999",
+                    "editorLineNumber.activeForeground": "#333333"
+                }
+            });
 
-    window.editor = monaco.editor.create(document.getElementById("editor"), {
-        value: `print("Hello Brainware")`,
-        language: "python",
-        theme: "formal-light",
-        automaticLayout: true, // Automatically adjusts to container size
-        
-        fontSize: 14, // Slightly scaled down for a more professional feel
-        fontFamily: "'Fira Code', Consolas, monospace",
-        fontLigatures: true,
-        
-        cursorBlinking: "smooth",
-        cursorStyle: "line",
-        
-        minimap: { enabled: false },
-        scrollBeyondLastLine: false,
-        wordWrap: "on",
-        padding: { top: 16, bottom: 16 } // Adds breathing room inside the editor
-    });
+            window.editor = monaco.editor.create(document.getElementById("editor"), {
+                value: `print("Hello Brainware")`,
+                language: "python",
+                theme: "formal-light",
+                automaticLayout: true, // Automatically adjusts to container size
 
-    // Ctrl + Enter to Run
-    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, function () {
-        if (typeof runCode === 'function') {
-            runCode();
-        }
-    });
+                fontSize: 14, // Slightly scaled down for a more professional feel
+                fontFamily: "'Fira Code', Consolas, monospace",
+                fontLigatures: true,
 
-});
-</script>
+                cursorBlinking: "smooth",
+                cursorStyle: "line",
 
-<script src="{{ url_for('static', filename='script.js') }}"></script>
+                minimap: { enabled: false },
+                scrollBeyondLastLine: false,
+                wordWrap: "on",
+                padding: { top: 16, bottom: 16 } // Adds breathing room inside the editor
+            });
+
+            // Ctrl + Enter to Run
+            editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, function () {
+                if (typeof runCode === 'function') {
+                    runCode();
+                }
+            });
+
+        });
+    </script>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
+
 </html>

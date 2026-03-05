@@ -119,6 +119,7 @@ body {
     display: flex;
     flex-direction: column;
     background-color: var(--output-bg);
+    overflow: hidden;
 }
 
 .output-header {
@@ -143,4 +144,38 @@ body {
     white-space: pre-wrap;
     line-height: 1.5;
     outline: none;
+}
+
+.tab-bar {
+    display: flex;
+    border-bottom: 1px solid var(--border-color);
+    background: var(--surface-color);
+}
+
+.tab-btn {
+    padding: 8px 12px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.tab-btn.active {
+    color: var(--text-main);
+    border-bottom: 2px solid var(--primary-btn);
+}
+
+.tab-content {
+    display: none;
+    padding: 16px;
+    font-family: 'Fira Code', monospace;
+    white-space: pre-wrap;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+}
+
+.tab-content.active {
+    display: block;
 }
