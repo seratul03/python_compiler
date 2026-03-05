@@ -131,6 +131,7 @@ def get_debug_info(code):
 
         ast_vis = ASTVisualizer()
         ast_tree = ast_vis.render(ast)
+        ast_json_data = ast_vis.render_json(ast)
 
         cfg_builder = CFGBuilder()
         cfg = cfg_builder.build(ast)
@@ -139,9 +140,9 @@ def get_debug_info(code):
         dis = BytecodeDisassembler()
         bytecode_text = dis.disassemble(instructions)
 
-        return {"ast": ast_tree, "cfg": cfg_text, "bytecode": bytecode_text}
+        return {"ast": ast_tree, "ast_json": ast_json_data, "cfg": cfg_text, "bytecode": bytecode_text}
     except Exception:
-        return {"ast": "", "cfg": "", "bytecode": ""}
+        return {"ast": "", "ast_json": None, "cfg": "", "bytecode": ""}
 
 
 def safe_exec(code, input_data=""):

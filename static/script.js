@@ -61,7 +61,7 @@ function runCode() {
             sessionOutput = "";
             outputBox.innerText = "";
 
-            document.getElementById('ast').innerText = data.ast || "";
+            renderASTTree(data.ast_json || null);
             document.getElementById('cfg').innerText = data.cfg || "";
             document.getElementById('bytecode').innerText = data.bytecode || "";
 
@@ -175,9 +175,78 @@ function resetCompiler() {
     outputBox.style.color = "#111827";
     outputBox.contentEditable = "false";
 
-    document.getElementById('ast').innerText = "";
+    document.getElementById('ast').innerHTML = "";
     document.getElementById('cfg').innerText = "";
     document.getElementById('bytecode').innerText = "";
 
     editor.setValue("");
+}
+
+// ── AST Tree Renderer ────────────────────────────────────────────────
+
+function getASTNodeClass(label) {
+    const type = label.split('(')[0];
+    const LITERALS = new Set(['Number','Float','String','BoolLiteral','NoneLiteral']);
+    const OPS      = new Set(['BinaryOp','UnaryOp','Compare','BoolOp']);
+    const CONTROLS = new Set(['IfStatement','WhileLoop','ForLoop','ForInLoop',
+                               'Return','Break','Continue','Pass']);
+    const FUNCS    = new Set(['FunctionDef','FunctionCall','ClassDef',
+                               'ClassInstantiation','MethodCall','MethodCallExpr',
+                               'SuperMethodCall']);
+    const VARS     = new Set(['Variable','Assignment','AttributeAssignment',
+                               'AugmentedAssignment','AttributeAugAssignment',
+                               'AttributeAccess','AttributeAccessExpr',
+                               'IndexAssignment','ListAccess','ExprSubscript']);
+    if (type === 'Program')   return 'ast-root';
+    if (LITERALS.has(type))   return 'ast-literal';
+    if (OPS.has(type))        return 'ast-op';
+    if (CONTROLS.has(type))   return 'ast-control';
+    if (FUNCS.has(type))      return 'ast-func';
+    if (VARS.has(type))       return 'ast-var';
+    return 'ast-other';
+}
+
+function buildASTNode(data) {
+    const li = document.createElement('li');
+    const hasChildren = Array.isArray(data.children) && data.children.length > 0;
+
+    const span = document.createElement('span');
+    span.className = `ast-node ${getASTNodeClass(data.label)}${hasChildren ? ' has-children' : ''}`;
+    span.appendChild(document.createTextNode(data.label));
+
+    if (hasChildren) {
+        const toggle = document.createElement('span');
+        toggle.className = 'ast-toggle';
+        toggle.textContent = '\u25be';
+        span.appendChild(toggle);
+        span.addEventListener('click', function () {
+            const collapsed = li.classList.toggle('ast-collapsed');
+            toggle.textContent = collapsed ? '\u25b8' : '\u25be';
+        });
+    }
+
+    li.appendChild(span);
+
+    if (hasChildren) {
+        const ul = document.createElement('ul');
+        data.children.forEach(child => ul.appendChild(buildASTNode(child)));
+        li.appendChild(ul);
+    }
+
+    return li;
+}
+
+function renderASTTree(astData) {
+    const container = document.getElementById('ast');
+    container.innerHTML = '';
+    if (!astData) return;
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'ast-tree';
+
+    const rootUl = document.createElement('ul');
+    rootUl.appendChild(buildASTNode(astData));
+    wrapper.appendChild(rootUl);
+
+    container.appendChild(wrapper);
 }
