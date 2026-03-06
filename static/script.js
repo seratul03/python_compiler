@@ -250,3 +250,32 @@ function renderASTTree(astData) {
 
     container.appendChild(wrapper);
 }
+
+const menu = document.getElementById("editor-menu");
+const editorEl = document.getElementById("editor");
+
+editorEl.addEventListener("contextmenu", function(e){
+
+    e.preventDefault();
+
+    menu.style.display = "block";
+    menu.style.left = e.pageX + "px";
+    menu.style.top = e.pageY + "px";
+
+});
+
+document.addEventListener("click", function(){
+    menu.style.display = "none";
+});
+
+function menuCut(){
+    document.execCommand("cut");
+}
+
+function menuCopy(){
+    document.execCommand("copy");
+}
+
+function menuPaste(){
+    document.execCommand("paste");
+}

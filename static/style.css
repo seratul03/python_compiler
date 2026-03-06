@@ -1,78 +1,116 @@
 :root {
-    --bg-color: #F6F8FC;
+    --bg-color: #F4F7FB;
     --surface-color: #FFFFFF;
-    --border-color: #E2E8F0;
-    --text-main: #0F172A;
-    --text-muted: #64748B;
-    --primary-btn: #4F46E5;
-    --primary-btn-hover: #4338CA;
-    --output-bg: #F8FAFC;
+    --border-color: #E3E8EF;
+
+    --text-main: #0B1220;
+    --text-muted: #6B7280;
+
+    --primary: #2563EB;
+    --primary-soft: #EAF2FF;
+
+    --output-bg: #FBFCFE;
+
+    --shadow-soft: 0 10px 25px rgba(0, 0, 0, 0.05);
 }
+
+/* PAGE BACKGROUND */
 
 body {
     margin: 0;
-    padding: 30px;
+    padding: 28px;
+
     background:
-        radial-gradient(circle at top right,#EEF2FF,transparent 40%),
-        radial-gradient(circle at bottom left,#E0F2FE,transparent 40%),
+        linear-gradient(#EEF2F7 1px, transparent 1px),
+        linear-gradient(90deg, #EEF2F7 1px, transparent 1px),
         var(--bg-color);
+
+    background-size: 28px 28px;
+
     font-family: 'Inter', sans-serif;
     color: var(--text-main);
+
     display: flex;
     justify-content: center;
     height: 100vh;
     box-sizing: border-box;
 }
 
+/* MAIN APP */
+
 .app-container {
     width: 100%;
-    max-width: 1500px;
+    max-width: 1550px;
     height: 100%;
-    background: rgba(255,255,255,0.8);
-    backdrop-filter: blur(12px);
-    border-radius: 14px;
-    box-shadow: 0 20px 40px rgba(0,0,0,0.05);
+
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(10px);
+
+    border-radius: 16px;
+
+    border: 1px solid var(--border-color);
+
+    box-shadow:
+        0 25px 60px rgba(0, 0, 0, 0.06),
+        inset 0 1px 0 rgba(255, 255, 255, 0.6);
+
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    border: 1px solid var(--border-color);
 }
+
+/* HEADER */
 
 .app-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 14px 24px;
+
+    padding: 16px 26px;
+
     border-bottom: 1px solid var(--border-color);
-    background-color: var(--surface-color);
+
+    background:
+        linear-gradient(to bottom, #FFFFFF, #F9FBFF);
 }
 
 .app-header h2 {
     margin: 0;
-    font-size: 16px;
+
+    font-size: 17px;
     font-weight: 600;
-    letter-spacing: -0.02em;
+
+    letter-spacing: -0.01em;
 }
 
+/* BUTTONS */
+
 .run-btn {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    background: linear-gradient(135deg,#4F46E5,#6366F1);
-    color: #ffffff;
+    background: linear-gradient(135deg, #2563EB, #3B82F6);
+
+    color: white;
+
     border: none;
     padding: 8px 16px;
+
     font-size: 13px;
     font-weight: 500;
+
     border-radius: 8px;
+
     cursor: pointer;
-    transition: all 0.2s ease;
+
+    transition: all .18s ease;
+
+    box-shadow: 0 6px 12px rgba(37, 99, 235, 0.18);
 }
 
 .run-btn:hover {
-    background: linear-gradient(135deg,#4338CA,#4F46E5);
     transform: translateY(-1px);
+    box-shadow: 0 10px 18px rgba(37, 99, 235, 0.25);
 }
+
+/* WORKSPACE */
 
 .workspace {
     display: flex;
@@ -81,153 +119,178 @@ body {
     overflow: hidden;
 }
 
-@media (min-width: 768px) {
+@media(min-width:768px) {
     .workspace {
         flex-direction: row;
     }
 }
 
+/* EDITOR */
+
 .editor-pane {
     flex: 2;
-    border-bottom: 1px solid var(--border-color);
     position: relative;
-    background: white;
-}
 
-@media (min-width: 768px) {
-    .editor-pane {
-        border-bottom: none;
-        border-right: 1px solid var(--border-color);
-    }
+    background: white;
+
+    border-right: 1px solid var(--border-color);
 }
 
 #editor {
     position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+    inset: 0;
 }
+
+/* OUTPUT PANEL */
 
 .output-pane {
     flex: 1;
     display: flex;
     flex-direction: column;
-    background-color: var(--output-bg);
-    overflow: hidden;
+
+    background: var(--output-bg);
 }
 
-.output-header {
-    padding: 12px 16px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    border-bottom: 1px solid var(--border-color);
-    background-color: var(--surface-color);
-}
-
-#output {
-    margin: 0;
-    padding: 16px;
-    flex-grow: 1;
-    font-family: 'Fira Code', monospace;
-    font-size: 13px;
-    color: var(--text-main);
-    overflow-y: auto;
-    white-space: pre-wrap;
-    line-height: 1.6;
-    outline: none;
-}
+/* TAB BAR */
 
 .tab-bar {
     display: flex;
+
+    padding: 8px;
     gap: 6px;
-    padding: 6px;
+
     border-bottom: 1px solid var(--border-color);
-    background: var(--surface-color);
+
+    background: white;
 }
 
 .tab-btn {
-    padding: 6px 12px;
-    border: none;
+    padding: 7px 12px;
+
+    border-radius: 7px;
+
+    border: 1px solid transparent;
+
     background: transparent;
-    cursor: pointer;
+
     font-size: 12px;
+
+    cursor: pointer;
+
     color: var(--text-muted);
-    border-radius: 6px;
-    transition: all 0.15s;
+
+    transition: all .15s ease;
+}
+
+.tab-btn:hover {
+    background: #F3F6FB;
 }
 
 .tab-btn.active {
-    color: var(--primary-btn);
-    background: #EEF2FF;
+    background: var(--primary-soft);
+    border-color: #D7E4FF;
+    color: var(--primary);
     font-weight: 500;
 }
+
+/* OUTPUT */
+
+#output {
+    padding: 16px;
+
+    flex-grow: 1;
+
+    font-family: 'Fira Code', monospace;
+    font-size: 13px;
+
+    color: #111827;
+
+    line-height: 1.6;
+
+    overflow-y: auto;
+
+    white-space: pre-wrap;
+}
+
+/* TAB CONTENT */
 
 .tab-content {
     display: none;
     padding: 16px;
+
     font-family: 'Fira Code', monospace;
-    white-space: pre-wrap;
+    font-size: 13px;
+
     overflow-y: auto;
     flex: 1;
-    min-height: 0;
+
+    white-space: pre-wrap;
 }
 
 .tab-content.active {
     display: block;
 }
 
+/* INPUT ROW */
+
 #input-row {
     display: none;
-    padding: 8px 16px;
+
+    padding: 10px 14px;
+
     border-top: 1px solid var(--border-color);
-    background: #ffffff;
+
+    background: white;
+
     gap: 8px;
     align-items: center;
-    flex-shrink: 0;
 }
 
 #user-input-field {
     flex: 1;
+
     padding: 8px 10px;
+
     border: 1px solid var(--border-color);
-    border-radius: 6px;
+
+    border-radius: 7px;
+
     font-family: monospace;
     font-size: 13px;
-    outline: none;
 }
 
 #user-input-field:focus {
-    border-color: var(--primary-btn);
+    outline: none;
+    border-color: var(--primary);
 }
 
 #input-row button {
-    padding: 7px 14px;
     background: #2563EB;
-    color: #ffffff;
+
+    color: white;
+
     border: none;
-    border-radius: 6px;
-    cursor: pointer;
+
+    padding: 7px 14px;
+
+    border-radius: 7px;
+
     font-size: 13px;
+
+    cursor: pointer;
 }
 
-/* Monaco right click menu */
+/* MONACO MENU */
+
 .monaco-menu {
-    background: #ffffff !important;
+    border-radius: 8px !important;
     border: 1px solid #E2E8F0 !important;
-    border-radius: 8px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.08);
+
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
 }
 
 .monaco-menu .action-item:hover {
     background: #EEF2FF !important;
-}
-
-.monaco-menu .action-label {
-    color: #0F172A !important;
 }
 
 /* ── AST Tree Visual ─────────────────────────────────────────── */
@@ -242,6 +305,7 @@ body {
     user-select: none;
     overflow: auto;
     padding: 4px 0;
+    gap: 4px;
 }
 
 .ast-tree ul {
@@ -255,6 +319,7 @@ body {
     margin-left: 10px;
     padding-left: 14px;
     border-left: 1.5px solid #CBD5E1;
+    gap: 12px;
 }
 
 /* Each non-root item */
@@ -292,7 +357,7 @@ body {
 .ast-node {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
+    gap: 15px;
     padding: 3px 10px;
     border-radius: 5px;
     font-size: 12px;
@@ -327,3 +392,30 @@ body {
 .ast-control { background: #FDF4FF; color: #7E22CE; border-color: #E9D5FF; }
 .ast-func    { background: #EFF6FF; color: #1D4ED8; border-color: #BFDBFE; }
 .ast-other   { background: #F8FAFC; color: #475569; border-color: #E2E8F0; }
+
+/* custom editor menu */
+
+#editor-menu{
+    position:absolute;
+    display:none;
+    min-width:140px;
+    background:#ffffff;
+    border:1px solid #E2E8F0;
+    border-radius:10px;
+    box-shadow:0 12px 30px rgba(0,0,0,0.12);
+    font-family:"Inter", sans-serif;
+    font-size:13px;
+    z-index:1000;
+    padding:6px;
+}
+
+.menu-item{
+    padding:8px 12px;
+    border-radius:6px;
+    cursor:pointer;
+    transition:background .12s ease;
+}
+
+.menu-item:hover{
+    background:#EEF2FF;
+}
