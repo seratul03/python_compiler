@@ -372,13 +372,21 @@ body {
 
 .ast-node.has-children { cursor: pointer; }
 .ast-node.has-children:hover { filter: brightness(0.92); }
+.ast-node.has-children:hover .ast-toggle { background: rgba(0, 0, 0, 0.15); }
 
 .ast-toggle {
-    font-size: 9px;
-    opacity: 0.55;
-    display: inline-block;
-    width: 10px;
-    text-align: center;
+    font-size: 13px;
+    font-weight: 700;
+    opacity: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.08);
+    flex-shrink: 0;
+    transition: background 0.12s, transform 0.12s;
 }
 
 /* Collapsed: hide child list */
