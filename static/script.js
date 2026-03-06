@@ -1,6 +1,25 @@
 const outputBoxEl = document.getElementById("output");
 outputBoxEl.contentEditable = "false";
 
+// ── Theme toggle ─────────────────────────────────────────────────────
+
+function toggleTheme() {
+    const isDark = document.body.getAttribute('data-theme') === 'dark';
+    if (isDark) {
+        document.body.removeAttribute('data-theme');
+        if (window.monaco) monaco.editor.setTheme('formal-light');
+        localStorage.setItem('pyflux-theme', 'light');
+    } else {
+        document.body.setAttribute('data-theme', 'dark');
+        if (window.monaco) monaco.editor.setTheme('formal-dark');
+        localStorage.setItem('pyflux-theme', 'dark');
+    }
+}
+
+function getTextColor() {
+    return document.body.getAttribute('data-theme') === 'dark' ? '#C2D8F0' : '#111827';
+}
+
 let currentPid = null;
 let pollTimer = null;
 let emptyPollCount = 0;
@@ -75,7 +94,7 @@ function runCode() {
     stopSession();
 
     outputBox.innerText = "Running...";
-    outputBox.style.color = "#111827";
+    outputBox.style.color = getTextColor();
     sessionOutput = "";
 
     showBuildingAnimation('ast', 'AST');
@@ -155,7 +174,7 @@ function pollOutput() {
 
             if (data.finished) {
                 stopSession();
-                outputBox.style.color = "#111827";
+                outputBox.style.color = getTextColor();
                 if (!sessionOutput) {
                     outputBox.innerText = "(no output)";
                 }
@@ -217,7 +236,7 @@ function resetCompiler() {
 
     const outputBox = outputBoxEl;
     outputBox.innerText = "";
-    outputBox.style.color = "#111827";
+    outputBox.style.color = getTextColor();
     outputBox.contentEditable = "false";
 
     document.getElementById('ast').innerHTML = "";

@@ -452,3 +452,223 @@ body {
     width: 3ch;
     text-align: left;
 }
+
+/* ══════════════════════════════════════════════════════════════
+   DARK THEME  —  "Deep Ocean"
+   Unique deep-ocean bioluminescent palette (not VS Code)
+   ══════════════════════════════════════════════════════════════ */
+
+body[data-theme="dark"] {
+    --bg-color:       #060E1A;
+    --surface-color:  #0C1A2E;
+    --border-color:   #172A40;
+    --text-main:      #C2D8F0;
+    --text-muted:     #4A6F8F;
+    --primary:        #00DCC0;
+    --primary-soft:   #002530;
+    --output-bg:      #06101C;
+    --shadow-soft:    0 10px 25px rgba(0, 0, 0, 0.55);
+
+    background:
+        linear-gradient(#0D1E32 1px, transparent 1px),
+        linear-gradient(90deg, #0D1E32 1px, transparent 1px),
+        var(--bg-color);
+
+    background-size: 28px 28px;
+    color: var(--text-main);
+}
+
+/* App Container */
+body[data-theme="dark"] .app-container {
+    background: rgba(10, 20, 36, 0.96);
+    border-color: var(--border-color);
+    box-shadow:
+        0 25px 60px rgba(0, 0, 0, 0.5),
+        inset 0 1px 0 rgba(0, 200, 180, 0.04);
+}
+
+/* Header */
+body[data-theme="dark"] .app-header {
+    background: linear-gradient(to bottom, #0E1E34, #0A1828);
+    border-bottom-color: var(--border-color);
+}
+
+body[data-theme="dark"] .app-header h2 {
+    color: #C2D8F0;
+}
+
+/* Run / Reset buttons */
+body[data-theme="dark"] .run-btn {
+    background: linear-gradient(135deg, #00BFA8, #009E8E);
+    box-shadow: 0 6px 12px rgba(0, 200, 180, 0.22);
+}
+
+body[data-theme="dark"] .run-btn:hover {
+    box-shadow: 0 10px 18px rgba(0, 200, 180, 0.34);
+}
+
+/* Editor pane */
+body[data-theme="dark"] .editor-pane {
+    background: #04101C;
+    border-right-color: var(--border-color);
+}
+
+/* Output pane + tab bar */
+body[data-theme="dark"] .tab-bar {
+    background: #0A1828;
+    border-bottom-color: var(--border-color);
+}
+
+body[data-theme="dark"] .tab-btn {
+    color: var(--text-muted);
+}
+
+body[data-theme="dark"] .tab-btn:hover {
+    background: #102038;
+}
+
+body[data-theme="dark"] .tab-btn.active {
+    background: #002C34;
+    border-color: #004A56;
+    color: #00DCC0;
+}
+
+/* Tab content areas */
+body[data-theme="dark"] .tab-content {
+    color: var(--text-main);
+}
+
+body[data-theme="dark"] #output {
+    color: #C2D8F0;
+}
+
+/* Input row */
+body[data-theme="dark"] #input-row {
+    background: #0A1828;
+    border-top-color: var(--border-color);
+}
+
+body[data-theme="dark"] #user-input-field {
+    background: #040E1A;
+    color: #C2D8F0;
+    border-color: var(--border-color);
+}
+
+body[data-theme="dark"] #user-input-field:focus {
+    border-color: #00DCC0;
+}
+
+body[data-theme="dark"] #input-row button {
+    background: #00BFA8;
+}
+
+/* Custom editor context menu */
+body[data-theme="dark"] #editor-menu {
+    background: #0C1A2E;
+    border-color: #1E3450;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
+    color: var(--text-main);
+}
+
+body[data-theme="dark"] .menu-item:hover {
+    background: #102840;
+}
+
+/* ── AST tree connectors ── */
+body[data-theme="dark"] .ast-tree ul ul {
+    border-left-color: #1C3450;
+}
+
+body[data-theme="dark"] .ast-tree ul ul > li::before {
+    border-top-color: #1C3450;
+}
+
+body[data-theme="dark"] .ast-tree ul ul > li:last-child::after {
+    background: var(--output-bg);
+}
+
+/* ── AST node colour palette (dark) ── */
+body[data-theme="dark"] .ast-root    { background: #0A1040; color: #818CF8; border-color: #1E2870; }
+body[data-theme="dark"] .ast-literal { background: #021C0E; color: #10DDA0; border-color: #033C1E; }
+body[data-theme="dark"] .ast-var     { background: #031C30; color: #00C8E0; border-color: #063850; }
+body[data-theme="dark"] .ast-op      { background: #280E04; color: #FF7043; border-color: #521A06; }
+body[data-theme="dark"] .ast-control { background: #180428; color: #C084FC; border-color: #3A0C5A; }
+body[data-theme="dark"] .ast-func    { background: #041028; color: #5BA8FB; border-color: #0A2250; }
+body[data-theme="dark"] .ast-other   { background: #0A1220; color: #5A7A96; border-color: #162432; }
+
+/* ── Toggle switch (moon / sun) ── */
+.switch {
+    font-size: 13px;
+    position: relative;
+    display: inline-block;
+    width: 4em;
+    height: 2.2em;
+    border-radius: 30px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.14);
+    flex-shrink: 0;
+}
+
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: #2a2a2a;
+    transition: 0.4s;
+    border-radius: 30px;
+    overflow: hidden;
+}
+
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 1.2em;
+    width: 1.2em;
+    border-radius: 20px;
+    left: 0.5em;
+    bottom: 0.5em;
+    transition: 0.4s;
+    transition-timing-function: cubic-bezier(0.81, -0.04, 0.38, 1.5);
+    box-shadow: inset 8px -4px 0px 0px #fff;
+}
+
+.switch input:checked + .slider {
+    background-color: #00a6ff;
+}
+
+.switch input:checked + .slider:before {
+    transform: translateX(1.8em);
+    box-shadow: inset 15px -4px 0px 15px #ffcf48;
+}
+
+.star {
+    background-color: #fff;
+    border-radius: 50%;
+    position: absolute;
+    width: 5px;
+    height: 5px;
+    transition: all 0.4s;
+}
+
+
+.switch input:checked ~ .slider .star {
+    opacity: 0;
+}
+
+/* .cloud {
+    width: 3.5em;
+    position: absolute;
+    bottom: -1.4em;
+    left: -1.1em;
+    opacity: 0;
+    transition: all 0.4s;
+} */
+
+.switch input:checked ~ .slider .cloud {
+    opacity: 1;
+}
