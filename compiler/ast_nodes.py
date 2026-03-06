@@ -256,3 +256,24 @@ class IndexAugAssignment(ASTNode):
         self.index = index
         self.operator = operator
         self.value = value
+
+
+class TupleLiteral(ASTNode):
+    """(a, b, ...)  tuple literal"""
+    def __init__(self, elements):
+        self.elements = elements
+
+
+class UnpackAssignment(ASTNode):
+    """a, b = expr  (tuple unpacking assignment)"""
+    def __init__(self, names, value):
+        self.names = names   # list of str
+        self.value = value
+
+
+class ChainedIndexAssignment(ASTNode):
+    """name[i][j] = value  (chained subscript assignment)"""
+    def __init__(self, name, indices, value):
+        self.name = name        # str
+        self.indices = indices  # list of ASTNode
+        self.value = value

@@ -94,6 +94,7 @@ class BytecodeGenerator:
             "/":  "DIV",
             "%":  "MOD",
             "**": "POW",
+            "//": "FLOORDIV",
         }
         self.instructions.append(Instruction(op_map[node.operator]))
 
@@ -417,7 +418,7 @@ class BytecodeGenerator:
     # Augmented assignments
     # ------------------------------------------------------------------ #
 
-    _AUG_OP_MAP = {"+": "ADD", "-": "SUB", "*": "MUL", "/": "DIV", "%": "MOD", "**": "POW"}
+    _AUG_OP_MAP = {"+": "ADD", "-": "SUB", "*": "MUL", "/": "DIV", "%": "MOD", "**": "POW", "//": "FLOORDIV"}
 
     def visit_AugmentedAssignment(self, node):
         # name OP= value  →  name = name OP value
@@ -531,3 +532,25 @@ class BytecodeGenerator:
         self.generate(node.obj_expr)
         self.generate(node.index)
         self.instructions.append(Instruction("LOAD_INDEX"))
+
+    def visit_TupleLiteral(self, node):
+        for elem in node.elements:
+            self.generate(elem)
+        self.instructions.append(Instruction("BUILD_TUPLE", len(node.elements)))
+
+    def visit_UnpackAssignment(self, node):
+        self.generate(node.value)
+        self.instructions.append(Instruction("UNPACK_SEQUENCE", len(node.names)))
+        for name in node.names:
+            self.instructions.append(Instruction("STORE_VAR", name))
+
+    def visit_ChainedIndexAssignment(self, node):
+        # board[row][col] = v  →  load board, load row, LOAD_INDEX (gets row-list),
+        # then load col, load v, STORE_INDEX  (mutates the row-list in place)
+        self.instructions.append(Instruction("LOAD_VAR", node.name))
+        for idx in node.indices[:-1]:
+            self.generate(idx)
+            self.instructions.append(Instruction("LOAD_INDEX"))
+        self.generate(node.indices[-1])
+        self.generate(node.value)
+        self.instructions.append(Instruction("STORE_INDEX"))

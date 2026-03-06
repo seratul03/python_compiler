@@ -56,6 +56,11 @@ class Parser:
             self.eat("PASS")
             return Pass()
 
+        # bare string literal (docstring as no-op)
+        if token.type == "STRING":
+            self.eat("STRING")
+            return Pass()
+
         # break
         if token.type == "BREAK":
             self.eat("BREAK")
@@ -66,16 +71,25 @@ class Parser:
             self.eat("CONTINUE")
             return Continue()
 
-        # print(a, b, ...)
+        # print(a, b, ..., end="", sep=" ")
         if token.type == "PRINT":
             self.eat("PRINT")
             self.eat("LPAREN")
             values = []
-            if self.current().type != "RPAREN":
-                values.append(self.bool_expr())
+            if self.current() and self.current().type != "RPAREN":
+                # skip leading keyword argument
+                if not (self.current().type == "IDENT" and self.peek() and self.peek().type == "ASSIGN"):
+                    values.append(self.bool_expr())
                 while self.current() and self.current().type == "COMMA":
                     self.eat("COMMA")
-                    values.append(self.bool_expr())
+                    if self.current() and self.current().type == "RPAREN":
+                        break
+                    if self.current().type == "IDENT" and self.peek() and self.peek().type == "ASSIGN":
+                        self.eat("IDENT")
+                        self.eat("ASSIGN")
+                        self.bool_expr()  # discard keyword arg value
+                    else:
+                        values.append(self.bool_expr())
             self.eat("RPAREN")
             return Print(values)
 
@@ -244,10 +258,21 @@ class Parser:
         "DIV_ASSIGN":   "/",
         "MOD_ASSIGN":   "%",
         "POW_ASSIGN":   "**",
+        "FLOORDIV_ASSIGN": "//",
     }
 
     def _parse_ident_statement(self):
         name = self.eat("IDENT").value
+
+        # a, b = expr  (tuple unpacking assignment)
+        if self.current() and self.current().type == "COMMA":
+            names = [name]
+            while self.current() and self.current().type == "COMMA":
+                self.eat("COMMA")
+                names.append(self.eat("IDENT").value)
+            self.eat("ASSIGN")
+            value = self.bool_expr()
+            return UnpackAssignment(names, value)
 
         # obj.attr = value  (attribute assignment)  or  obj.method(args)
         if self.current() and self.current().type == "DOT":
@@ -284,18 +309,24 @@ class Parser:
                 return ExprStatement(MethodCall(name, attr, args))
             raise Exception(f"Expected assignment or call after {name}.{attr}")
 
-        # name[index] OP= value  or  name[index] = value
+        # name[i]...[j] = value  or  name[i] OP= value
         if self.current() and self.current().type == "LBRACKET":
             self.eat("LBRACKET")
-            index = self.bool_expr()
+            indices = [self.bool_expr()]
             self.eat("RBRACKET")
+            while self.current() and self.current().type == "LBRACKET":
+                self.eat("LBRACKET")
+                indices.append(self.bool_expr())
+                self.eat("RBRACKET")
             if self.current() and self.current().type in self._AUG_OPS:
                 op = self._AUG_OPS[self.eat(self.current().type).type]
                 value = self.bool_expr()
-                return IndexAugAssignment(name, index, op, value)
+                return IndexAugAssignment(name, indices[0], op, value)
             self.eat("ASSIGN")
             value = self.bool_expr()
-            return IndexAssignment(name, index, value)
+            if len(indices) == 1:
+                return IndexAssignment(name, indices[0], value)
+            return ChainedIndexAssignment(name, indices, value)
 
         # name OP= value  (augmented variable assignment)
         if self.current() and self.current().type in self._AUG_OPS:
@@ -402,7 +433,7 @@ class Parser:
 
     def term(self):
         left = self.power()
-        while self.current() and self.current().type in ("MULT", "DIV", "MOD"):
+        while self.current() and self.current().type in ("MULT", "DIV", "MOD", "FLOORDIV"):
             op = self.eat(self.current().type).value
             right = self.power()
             left = BinaryOp(left, op, right)
@@ -471,9 +502,21 @@ class Parser:
 
         if token.type == "LPAREN":
             self.eat("LPAREN")
-            expr = self.bool_expr()
+            if self.current() and self.current().type == "RPAREN":
+                self.eat("RPAREN")
+                return TupleLiteral([])
+            first = self.bool_expr()
+            if self.current() and self.current().type == "COMMA":
+                elements = [first]
+                while self.current() and self.current().type == "COMMA":
+                    self.eat("COMMA")
+                    if self.current() and self.current().type == "RPAREN":
+                        break
+                    elements.append(self.bool_expr())
+                self.eat("RPAREN")
+                return TupleLiteral(elements)
             self.eat("RPAREN")
-            return expr
+            return first
 
         if token.type == "LBRACKET":
             return self._parse_list_or_comp()
@@ -485,8 +528,14 @@ class Parser:
             f"Invalid expression token: {token.type}={token.value!r} at line {token.line}"
         )
 
+    def _skip_newlines(self):
+        """Skip NEWLINE/INDENT/DEDENT — used inside multi-line list/tuple literals."""
+        while self.current() and self.current().type in ("NEWLINE", "INDENT", "DEDENT"):
+            self.pos += 1
+
     def _parse_list_or_comp(self):
         self.eat("LBRACKET")
+        self._skip_newlines()
 
         if self.current() and self.current().type == "RBRACKET":
             self.eat("RBRACKET")
@@ -509,9 +558,11 @@ class Parser:
         elements = [first_expr]
         while self.current() and self.current().type == "COMMA":
             self.eat("COMMA")
+            self._skip_newlines()
             if self.current() and self.current().type == "RBRACKET":
                 break
             elements.append(self.bool_expr())
+        self._skip_newlines()
         self.eat("RBRACKET")
         return ListLiteral(elements)
 

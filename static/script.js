@@ -7,6 +7,48 @@ let emptyPollCount = 0;
 let isWaitingForInput = false;
 let sessionOutput = "";
 
+// ── Building animation ────────────────────────────────────────────────
+const _buildingTimers = {};
+
+function showBuildingAnimation(sectionId, label) {
+    stopBuildingAnimation(sectionId);
+    const el = document.getElementById(sectionId);
+    el.innerHTML = '';
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'building-anim';
+
+    const text = document.createElement('span');
+    text.textContent = 'Building ' + label;
+
+    const dots = document.createElement('span');
+    dots.className = 'building-dots';
+    dots.textContent = '';
+
+    wrapper.appendChild(text);
+    wrapper.appendChild(dots);
+    el.appendChild(wrapper);
+
+    let count = 0;
+    _buildingTimers[sectionId] = setInterval(() => {
+        count = (count % 3) + 1;
+        dots.textContent = '.'.repeat(count);
+    }, 380);
+}
+
+function stopBuildingAnimation(sectionId) {
+    if (_buildingTimers[sectionId]) {
+        clearInterval(_buildingTimers[sectionId]);
+        delete _buildingTimers[sectionId];
+    }
+}
+
+function stopAllBuildingAnimations() {
+    stopBuildingAnimation('ast');
+    stopBuildingAnimation('cfg');
+    stopBuildingAnimation('bytecode');
+}
+
 function switchTab(tab) {
 
     document.querySelectorAll(".tab-content").forEach(el => {
@@ -36,9 +78,9 @@ function runCode() {
     outputBox.style.color = "#111827";
     sessionOutput = "";
 
-    document.getElementById('ast').innerText = "";
-    document.getElementById('cfg').innerText = "";
-    document.getElementById('bytecode').innerText = "";
+    showBuildingAnimation('ast', 'AST');
+    showBuildingAnimation('cfg', 'CFG');
+    showBuildingAnimation('bytecode', 'Bytecode');
 
     fetch("/start", {
         method: "POST",
@@ -48,6 +90,7 @@ function runCode() {
         .then(res => res.json())
         .then(data => {
             if (data.error) {
+                stopAllBuildingAnimations();
                 outputBox.innerText = typeof data.error === "object"
                     ? data.error.type + ":\n" + data.error.message
                     : data.error;
@@ -61,6 +104,7 @@ function runCode() {
             sessionOutput = "";
             outputBox.innerText = "";
 
+            stopAllBuildingAnimations();
             renderASTTree(data.ast_json || null);
             document.getElementById('cfg').innerText = data.cfg || "";
             document.getElementById('bytecode').innerText = data.bytecode || "";
@@ -68,6 +112,7 @@ function runCode() {
             pollTimer = setInterval(pollOutput, 150);
         })
         .catch(() => {
+            stopAllBuildingAnimations();
             outputBox.innerText = "Error communicating with server.";
             outputBox.style.color = "red";
         });
@@ -178,6 +223,8 @@ function resetCompiler() {
     document.getElementById('ast').innerHTML = "";
     document.getElementById('cfg').innerText = "";
     document.getElementById('bytecode').innerText = "";
+
+    stopAllBuildingAnimations();
 
     editor.setValue("");
 }

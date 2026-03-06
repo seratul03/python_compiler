@@ -20,6 +20,8 @@ TOKEN_SPEC = [
     ("MINUS_ASSIGN", r"-="),             
     ("MINUS",        r"-"),
     ("MULT",         r"\*"),
+    ("FLOORDIV_ASSIGN", r"//="),
+    ("FLOORDIV",     r"//"),
     ("DIV_ASSIGN",   r"/="),               
     ("DIV",          r"/"),
     ("MOD_ASSIGN",   r"%="),                
@@ -90,6 +92,13 @@ def tokenize(code):
     tokens = []
     indent_stack = [0]
     code = code.replace("\r", "")
+
+    # Pre-process: collapse triple-quoted strings to "" preserving line count
+    def _replace_tq(m):
+        newlines = m.group(0).count('\n')
+        return '""' + '\n' * newlines
+    code = re.sub(r'"""[\s\S]*?"""|\'\'\'[\s\S]*?\'\'\'', _replace_tq, code)
+
     lines = code.split("\n")
 
     for line_num, line in enumerate(lines, start=1):

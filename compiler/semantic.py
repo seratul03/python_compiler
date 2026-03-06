@@ -122,14 +122,10 @@ class SemanticAnalyzer:
 
     def visit_IfStatement(self, node):
         self.visit(node.condition)
-        self.enter_scope()
         for stmt in node.body:
             self.visit(stmt)
-        self.exit_scope()
-        self.enter_scope()
         for stmt in node.else_body:
             self.visit(stmt)
-        self.exit_scope()
 
     def visit_WhileLoop(self, node):
         self.visit(node.condition)
@@ -277,3 +273,19 @@ class SemanticAnalyzer:
     def visit_ExprSubscript(self, node):
         self.visit(node.obj_expr)
         self.visit(node.index)
+
+    def visit_TupleLiteral(self, node):
+        for e in node.elements:
+            self.visit(e)
+
+    def visit_UnpackAssignment(self, node):
+        self.visit(node.value)
+        for name in node.names:
+            self.declare(name)
+
+    def visit_ChainedIndexAssignment(self, node):
+        if not self.is_declared(node.name):
+            raise SemanticError(f"Variable '{node.name}' is not defined")
+        for idx in node.indices:
+            self.visit(idx)
+        self.visit(node.value)

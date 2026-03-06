@@ -94,3 +94,16 @@ class Optimizer:
 
         node.body = new_body
         return node
+
+    def visit_TupleLiteral(self, node):
+        node.elements = [self.visit(e) for e in node.elements]
+        return node
+
+    def visit_UnpackAssignment(self, node):
+        node.value = self.visit(node.value)
+        return node
+
+    def visit_ChainedIndexAssignment(self, node):
+        node.indices = [self.visit(idx) for idx in node.indices]
+        node.value = self.visit(node.value)
+        return node

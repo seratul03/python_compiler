@@ -172,6 +172,12 @@ class VirtualMachine:
                 elems.reverse()
                 self.stack.append(elems)
 
+            elif op == "BUILD_TUPLE":
+                count = instr.argument
+                elems = [self.stack.pop() for _ in range(count)]
+                elems.reverse()
+                self.stack.append(tuple(elems))
+
             elif op == "UNPACK_SEQUENCE":
                 n   = instr.argument
                 seq = self.stack.pop()
@@ -209,7 +215,7 @@ class VirtualMachine:
                 values.reverse()
                 self.output.append(" ".join(self._fmt(v) for v in values))
 
-            elif op in ("ADD", "SUB", "MUL", "DIV", "MOD", "POW"):
+            elif op in ("ADD", "SUB", "MUL", "DIV", "MOD", "POW", "FLOORDIV"):
                 b = self.stack.pop()
                 a = self.stack.pop()
                 if op == "ADD":
@@ -222,6 +228,8 @@ class VirtualMachine:
                     result = a / b
                 elif op == "MOD":
                     result = a % b
+                elif op == "FLOORDIV":
+                    result = a // b
                 else:
                     result = a ** b
                 self.stack.append(result)
