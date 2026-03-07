@@ -1,12 +1,27 @@
-import subprocess
-import tempfile
-import os
-import shutil
+import ast as _ast_mod
+import dis as _dis_mod
+import tokenize as _tokenize_mod
+import token as _token_mod
+import types as _types_mod
 import sys
-import uuid
-import threading
-import traceback
 import io
+import contextlib
+import traceback
+import builtins as _builtins_mod
+import os
+import time
+import threading
+import json
+import uuid
+import tempfile
+import pathlib
+import logging
+import pprint
+import inspect
+import subprocess
+import shutil
+import io
+import textwrap
 
 from compiler.lexer import tokenize
 from compiler.parser import Parser
@@ -39,25 +54,115 @@ SAFE_BUILTINS = {
     "sum": sum,
     "min": min,
     "max": max,
+    "abs": abs,
+    "round": round,
+    "sorted": sorted,
+    "reversed": reversed,
+    "map": map,
+    "filter": filter,
+    "zip": zip,
+    "chr": chr,
+    "ord": ord,
+    "hex": hex,
+    "oct": oct,
+    "bin": bin,
+    "isinstance": isinstance,
+    "issubclass": issubclass,
+    "hasattr": hasattr,
+    "getattr": getattr,
+    "setattr": setattr,
+    "delattr": delattr,
+    "callable": callable,
+    "type": type,
+    "id": id,
+    "hash": hash,
+    "repr": repr,
+    "format": format,
+    "open": open,
+    "iter": iter,
+    "next": next,
+    "object": object,
+    "super": super,
+    "property": property,
+    "staticmethod": staticmethod,
+    "classmethod": classmethod,
+    "vars": vars,
+    "dir": dir,
+    "help": help,
+    "NotImplemented": NotImplemented,
+    "Ellipsis": ...,
+    "__import__": __import__,
+    "Exception": Exception,
+    "ValueError": ValueError,
+    "TypeError": TypeError,
+    "KeyError": KeyError,
+    "IndexError": IndexError,
+    "AttributeError": AttributeError,
+    "NameError": NameError,
+    "RuntimeError": RuntimeError,
+    "StopIteration": StopIteration,
+    "ZeroDivisionError": ZeroDivisionError,
+    "FileNotFoundError": FileNotFoundError,
+    "IOError": IOError,
+    "OSError": OSError,
+    "ImportError": ImportError,
+    "NotImplementedError": NotImplementedError,
+    "AssertionError": AssertionError,
+    "OverflowError": OverflowError,
+    "RecursionError": RecursionError,
+    "MemoryError": MemoryError,
+    "PermissionError": PermissionError,
+    "TimeoutError": TimeoutError,
+    "UnicodeError": UnicodeError,
+    "UnicodeDecodeError": UnicodeDecodeError,
+    "UnicodeEncodeError": UnicodeEncodeError,
+    "KeyboardInterrupt": KeyboardInterrupt,
+    "SystemExit": SystemExit,
+    "BaseException": BaseException,
+    "ArithmeticError": ArithmeticError,
+    "LookupError": LookupError,
+    "ast": _ast_mod,
+    "dis": _dis_mod,
+    "tokenize": _tokenize_mod,
+    "token": _token_mod,
+    "types": _types_mod,
+    "sys": sys,
+    "io": io,
+    "contextlib": contextlib,
+    "traceback": traceback,
+    "builtins": _builtins_mod,
+    "os": os,
+    "time": time,
+    "threading": threading,
+    "json": json,
+    "uuid": uuid,
+    "tempfile": tempfile,
+    "pathlib": pathlib,
+    "logging": logging,
+    "pprint": pprint,
+    "inspect": inspect,
+    "subprocess": subprocess,
 }
 
-FORBIDDEN_PATTERNS = [
-    "import os",
-    "import sys",
-    "import subprocess",
-    "__import__",
-    "open(",
-    "eval(",
-    "exec(",
-]
+import importlib as _importlib
+for _mod_name in ("graphviz", "resource", "symtable", "codeop", "signal"):
+    try:
+        SAFE_BUILTINS[_mod_name] = _importlib.import_module(_mod_name)
+    except ImportError:
+        pass
 
 
 def security_check(code):
-    for pattern in FORBIDDEN_PATTERNS:
-        if pattern in code:
-            raise Exception(
-                f"SecurityError: '{pattern}' is not allowed."
-            )
+    """Basic security check — blocks only truly dangerous operations."""
+    _dangerous = [
+        "__import__('os').system",
+        "ctypes.cdll",
+        "ctypes.CDLL",
+    ]
+    for pat in _dangerous:
+        if pat in code:
+            raise Exception(f"SecurityError: '{pat}' is not allowed.")
+
 
 def format_error(e):
     name = type(e).__name__

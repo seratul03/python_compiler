@@ -47,40 +47,60 @@ def _unescape_string(s):
 
 
 TOKEN_SPEC = [
-    ("SKIP",         r"[ \t]+"),
-    ("FLOAT",        r"\d+\.\d+"),         
-    ("NUMBER",       r"\d+"),
-    ("FSTRING",      r'f"[^"]*"|f\'[^\']*\''),
-    ("STRING",       r'"[^"]*"|\'[^\']*\''), 
-    ("EQ",           r"=="),
-    ("NEQ",          r"!="),
-    ("LE",           r"<="),
-    ("GE",           r">="),
-    ("POW_ASSIGN",   r"\*\*="),           
-    ("POW",          r"\*\*"),            
-    ("MULT_ASSIGN",  r"\*="),            
-    ("LT",           r"<"),
-    ("GT",           r">"),
-    ("IDENT",        r"[^\W\d]\w*"),
-    ("PLUS_ASSIGN",  r"\+="),
-    ("PLUS",         r"\+"),
-    ("MINUS_ASSIGN", r"-="),             
-    ("MINUS",        r"-"),
-    ("MULT",         r"\*"),
-    ("FLOORDIV_ASSIGN", r"//="),
-    ("FLOORDIV",     r"//"),
-    ("DIV_ASSIGN",   r"/="),               
-    ("DIV",          r"/"),
-    ("MOD_ASSIGN",   r"%="),                
-    ("MOD",          r"%"),
-    ("ASSIGN",       r"="),
-    ("LPAREN",       r"\("),
-    ("RPAREN",       r"\)"),
-    ("COLON",        r":"),
-    ("COMMA",        r","),
-    ("LBRACKET",     r"\["),
-    ("RBRACKET",     r"\]"),
-    ("DOT",          r"\.")
+    ("SKIP",              r"[ \t]+"),
+    ("FLOAT",             r"\d+\.\d+"),
+    ("NUMBER",            r"\d+"),
+    ("FSTRING",           r'f"(?:[^"\\]|\\.)*"|f\'(?:[^\'\\]|\\.)*\''),
+    ("STRING",            r'"(?:[^"\\]|\\.)*"|\'(?:[^\'\\]|\\.)*\''),
+    ("LSHIFT_ASSIGN",     r"<<="),
+    ("RSHIFT_ASSIGN",     r">>="),
+    ("POW_ASSIGN",        r"\*\*="),
+    ("FLOORDIV_ASSIGN",   r"//="),
+    ("AND_ASSIGN",        r"&="),
+    ("OR_ASSIGN",         r"\|="),
+    ("XOR_ASSIGN",        r"\^="),
+    ("AT_ASSIGN",         r"@="),
+    ("PLUS_ASSIGN",       r"\+="),
+    ("MINUS_ASSIGN",      r"-="),
+    ("MULT_ASSIGN",       r"\*="),
+    ("DIV_ASSIGN",        r"/="),
+    ("MOD_ASSIGN",        r"%="),
+    ("WALRUS",            r":="),
+    ("ARROW",             r"->"),
+    ("EQ",                r"=="),
+    ("NEQ",               r"!="),
+    ("LSHIFT",            r"<<"),
+    ("RSHIFT",            r">>"),
+    ("LE",                r"<="),
+    ("GE",                r">="),
+    ("POW",               r"\*\*"),
+    ("FLOORDIV",          r"//"),
+    ("IDENT",             r"[^\W\d]\w*"),
+    ("LT",                r"<"),
+    ("GT",                r">"),
+    ("PLUS",              r"\+"),
+    ("MINUS",             r"-"),
+    ("MULT",              r"\*"),
+    ("DIV",               r"/"),
+    ("MOD",               r"%"),
+    ("AT",                r"@"),
+    ("BITAND",            r"&"),
+    ("BITOR",             r"\|"),
+    ("BITXOR",            r"\^"),
+    ("BITNOT",            r"~"),
+    ("ASSIGN",            r"="),
+    ("LPAREN",            r"\("),
+    ("RPAREN",            r"\)"),
+    ("COLON",             r":"),
+    ("COMMA",             r","),
+    ("LBRACKET",          r"\["),
+    ("RBRACKET",          r"\]"),
+    ("LBRACE",            r"\{"),
+    ("RBRACE",            r"\}"),
+    ("SEMICOLON",         r";"),
+    ("ELLIPSIS",          r"\.\.\."),
+    ("DOT",               r"\."),
+    ("BACKSLASH",         r"\\"),
 ]
 
 TOKEN_REGEX = "|".join(f"(?P<{name}>{pattern})" for name, pattern in TOKEN_SPEC)
@@ -121,6 +141,8 @@ KEYWORDS = {
     "nonlocal": "NONLOCAL",
     "yield":    "YIELD",
     "assert":   "ASSERT",
+    "async":    "ASYNC",
+    "await":    "AWAIT",
 }
 
 
@@ -141,8 +163,25 @@ def tokenize(code):
     code = code.replace("\r", "")
 
     def _replace_tq(m):
-        newlines = m.group(0).count('\n')
-        return '""' + '\n' * newlines
+        content = m.group(0)
+        newlines = content.count('\n')
+        if content.startswith('"""'):
+            inner = content[3:-3]
+            escaped = (inner.replace('\\', '\\\\')
+                           .replace('"', '\\"')
+                           .replace('\n', '\\n')
+                           .replace('\r', '\\r')
+                           .replace('\t', '\\t'))
+            result = f'"{escaped}"'
+        else:
+            inner = content[3:-3]
+            escaped = (inner.replace('\\', '\\\\')
+                           .replace("'", "\\'")
+                           .replace('\n', '\\n')
+                           .replace('\r', '\\r')
+                           .replace('\t', '\\t'))
+            result = f"'{escaped}'"
+        return result + '\n' * newlines
     code = re.sub(r'"""[\s\S]*?"""|\'\'\'[\s\S]*?\'\'\'', _replace_tq, code)
 
     lines = code.split("\n")
@@ -215,6 +254,13 @@ def tokenize(code):
                     tokens.append(Token(KEYWORDS[value], value, line_num, pos))
                 else:
                     tokens.append(Token("IDENT", value, line_num, pos))
+
+            elif kind == "BACKSLASH":
+                pos += len(value)
+                continue
+
+            elif kind == "SEMICOLON":
+                tokens.append(Token("NEWLINE", value, line_num, pos))
 
             else:
                 tokens.append(Token(kind, value, line_num, pos))

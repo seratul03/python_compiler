@@ -272,3 +272,154 @@ class SemanticAnalyzer:
         for idx in node.indices:
             self.visit(idx)
         self.visit(node.value)
+
+    def visit_Import(self, node):
+        for name, alias in node.names:
+            store_as = alias if alias else name.split(".")[0]
+            self.declare(store_as)
+
+    def visit_ImportFrom(self, node):
+        for attr, alias in node.names:
+            if attr != "*":
+                store_as = alias if alias else attr
+                self.declare(store_as)
+
+    def visit_GlobalStatement(self, node):
+        for name in node.names:
+            self.scopes[0][name] = True   
+
+    def visit_NonlocalStatement(self, node):
+        for name in node.names:
+            self.declare(name)
+
+    def visit_DeleteStatement(self, node):
+        pass 
+
+    def visit_RaiseStatement(self, node):
+        if node.exc is not None:
+            self.visit(node.exc)
+
+    def visit_Assert(self, node):
+        self.visit(node.condition)
+        if node.message is not None:
+            self.visit(node.message)
+
+    def visit_TryExcept(self, node):
+        for stmt in (node.body or []):
+            self.visit(stmt)
+        for handler in (node.handlers or []):
+            self.enter_scope()
+            if handler.var_name:
+                self.declare(handler.var_name)
+            for stmt in (handler.body or []):
+                self.visit(stmt)
+            self.exit_scope()
+        for stmt in (node.else_body or []):
+            self.visit(stmt)
+        for stmt in (node.finally_body or []):
+            self.visit(stmt)
+
+    def visit_WithStatement(self, node):
+        self.enter_scope()
+        for ctx_expr, var_name in (node.items or []):
+            self.visit(ctx_expr)
+            if var_name:
+                self.declare(var_name)
+        for stmt in (node.body or []):
+            self.visit(stmt)
+        self.exit_scope()
+
+    def visit_YieldExpr(self, node):
+        if node.value is not None:
+            self.visit(node.value)
+
+    def visit_LambdaExpr(self, node):
+        self.enter_scope()
+        for param in node.params:
+            self.declare(param)
+        self.visit(node.body)
+        self.exit_scope()
+
+    def visit_WalrusExpr(self, node):
+        self.visit(node.value)
+        self.declare(node.name)
+
+    def visit_IfExpr(self, node):
+        self.visit(node.condition)
+        self.visit(node.body)
+        self.visit(node.orelse)
+
+    def visit_EllipsisNode(self, node):
+        pass
+
+    def visit_Decorated(self, node):
+        for dec in node.decorators:
+            self.visit(dec)
+        self.visit(node.node)
+
+    def visit_BitwiseOp(self, node):
+        self.visit(node.left)
+        self.visit(node.right)
+
+    def visit_UnaryBitNot(self, node):
+        self.visit(node.operand)
+
+    def visit_DictLiteral(self, node):
+        for k in node.keys:
+            if k is not None:
+                self.visit(k)
+        for v in node.values:
+            self.visit(v)
+
+    def visit_SetLiteral(self, node):
+        for e in node.elements:
+            self.visit(e)
+
+    def visit_DictComprehension(self, node):
+        self.visit(node.iterable)
+        self.enter_scope()
+        self.declare(node.var_name)
+        self.visit(node.key_expr)
+        self.visit(node.val_expr)
+        if node.condition:
+            self.visit(node.condition)
+        self.exit_scope()
+
+    def visit_SetComprehension(self, node):
+        self.visit(node.iterable)
+        self.enter_scope()
+        self.declare(node.var_name)
+        self.visit(node.expr)
+        if node.condition:
+            self.visit(node.condition)
+        self.exit_scope()
+
+    def visit_GeneratorExpr(self, node):
+        self.visit(node.iterable)
+        self.enter_scope()
+        self.declare(node.var_name)
+        self.visit(node.expr)
+        if node.condition:
+            self.visit(node.condition)
+        self.exit_scope()
+
+    def visit_Slice(self, node):
+        if node.start:  self.visit(node.start)
+        if node.stop:   self.visit(node.stop)
+        if node.step:   self.visit(node.step)
+
+    def visit_Starred(self, node):
+        self.visit(node.value)
+
+    def visit_DoubleStarred(self, node):
+        self.visit(node.value)
+
+    def visit_KeywordArg(self, node):
+        self.visit(node.value)
+
+    def visit_FStringExpr(self, node):
+        pass
+
+    def visit_FString(self, node):
+        pass
+

@@ -44,8 +44,44 @@ class CFGBuilder:
                     b_n.edges.append(node)
                 current_prevs = [node]
 
+            elif stmt_type == "ForInLoop":
+                body_ends = self._build_block(stmt.body, [node])
+                for b_n in body_ends:
+                    b_n.edges.append(node)
+                current_prevs = [node]
+
+            elif stmt_type == "FunctionDef":
+                self._build_block(stmt.body, [node])
+                current_prevs = [node]
+
+            elif stmt_type == "ClassDef":
+                self._build_block(stmt.body, [node])
+                current_prevs = [node]
+
+            elif stmt_type == "TryExcept":
+                try_ends = self._build_block(getattr(stmt, "body", []), [node])
+                handler_ends = []
+                for handler in (getattr(stmt, "handlers", None) or []):
+                    handler_ends += self._build_block(getattr(handler, "body", []), [node])
+                else_ends = self._build_block(getattr(stmt, "else_body", None) or [], try_ends)
+                finally_ends = self._build_block(getattr(stmt, "finally_body", None) or [], try_ends + handler_ends + else_ends)
+                current_prevs = finally_ends if finally_ends else (try_ends + handler_ends)
+
+            elif stmt_type == "WithStatement":
+                body_ends = self._build_block(stmt.body, [node])
+                current_prevs = body_ends
+
+            elif stmt_type == "Decorated":
+                inner = getattr(stmt, "node", None)
+                if inner:
+                    inner_body = getattr(inner, "body", [])
+                    if inner_body:
+                        self._build_block(inner_body, [node])
+                current_prevs = [node]
+
             else:
                 current_prevs = [node]
+
 
         return current_prevs
 

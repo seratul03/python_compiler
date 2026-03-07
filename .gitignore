@@ -33,3 +33,5 @@ npm-debug.log*
 tmp/
 temp/
 *.tmp
+[__pycache__/]
+[*/__pycache__/]

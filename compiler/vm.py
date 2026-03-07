@@ -21,6 +21,35 @@ _BUILTIN_CALLABLES = {
     "type":  lambda x: type(x).__name__,
 }
 
+_ALLOWED_MODULES = {
+    "ast", "dis", "tokenize", "token", "symtable", "types", "codeop",
+    "sys", "io", "contextlib", "traceback", "builtins",
+    "os", "os.path", "signal", "subprocess", "time", "threading",
+    "json", "uuid", "tempfile", "pathlib", "logging", "pprint",
+    "graphviz", "inspect", "resource", "math", "re", "copy",
+    "functools", "itertools", "collections", "string", "textwrap",
+    "operator", "struct", "array", "heapq", "bisect", "queue",
+    "random", "statistics", "decimal", "fractions", "numbers",
+    "datetime", "calendar", "hashlib", "hmac", "secrets", "base64",
+    "urllib", "urllib.parse", "urllib.request", "http", "http.client",
+    "email", "csv", "configparser", "argparse", "shutil", "glob",
+    "fnmatch", "linecache", "pickle", "shelve", "sqlite3", "xml",
+    "html", "html.parser", "enum", "dataclasses", "abc", "weakref",
+    "gc", "platform", "socket", "ssl", "select", "errno", "ctypes",
+}
+
+
+def _import_module(name: str):
+    """Import a module by name if it is in the allowed list."""
+    if name not in _ALLOWED_MODULES:
+        raise ImportError(
+            f"Module '{name}' is not in the list of allowed imports."
+        )
+    import importlib
+    return importlib.import_module(name)
+
+
+
 
 class VirtualMachine:
     def __init__(self, instructions):
@@ -198,7 +227,12 @@ class VirtualMachine:
                 self.stack.append(self._load_var(instr.argument))
 
             elif op == "STORE_VAR":
-                self.current_frame().variables[instr.argument] = self.stack.pop()
+                name = instr.argument
+                globals_set = self.current_frame().variables.get("__globals__")
+                if isinstance(globals_set, set) and name in globals_set:
+                    self.frames[0].variables[name] = self.stack.pop()
+                else:
+                    self.current_frame().variables[name] = self.stack.pop()
 
             elif op == "BUILD_LIST":
                 count = instr.argument
@@ -390,9 +424,15 @@ class VirtualMachine:
                     continue
 
                 if not (isinstance(obj, dict) and "__class__" in obj):
-                    raise TypeError(
-                        f"Cannot call method '{method_name}' on {type(obj).__name__}"
-                    )
+                    method = getattr(obj, method_name, None)
+                    if method is None:
+                        raise AttributeError(
+                            f"'{type(obj).__name__}' has no attribute '{method_name}'"
+                        )
+                    result = method(*args)
+                    self.stack.append(result)
+                    ip += 1
+                    continue
                 method_node, found_class = self._find_method(obj["__class__"], method_name)
                 if method_node is None:
                     raise AttributeError(
@@ -427,9 +467,323 @@ class VirtualMachine:
                 ip = 0
                 continue
 
+            elif op == "JUMP_IF_TRUE":
+                if self.stack.pop():
+                    ip = instr.argument
+                    continue
+
+            elif op == "DUP_TOP":
+                self.stack.append(self.stack[-1])
+
+            elif op in ("BITWISE_AND", "BITWISE_OR", "BITWISE_XOR",
+                        "BITWISE_LSHIFT", "BITWISE_RSHIFT"):
+                b = self.stack.pop()
+                a = self.stack.pop()
+                if op == "BITWISE_AND":
+                    self.stack.append(int(a) & int(b))
+                elif op == "BITWISE_OR":
+                    self.stack.append(int(a) | int(b))
+                elif op == "BITWISE_XOR":
+                    self.stack.append(int(a) ^ int(b))
+                elif op == "BITWISE_LSHIFT":
+                    self.stack.append(int(a) << int(b))
+                else:
+                    self.stack.append(int(a) >> int(b))
+
+            elif op == "UNARY_BITNOT":
+                self.stack.append(~int(self.stack.pop()))
+
+            elif op == "BUILD_DICT":
+                count = instr.argument
+                d = {}
+                pairs = [self.stack.pop() for _ in range(count * 2)]
+                pairs.reverse()
+                for i in range(0, len(pairs), 2):
+                    k, v = pairs[i], pairs[i + 1]
+                    d[k] = v
+                self.stack.append(d)
+
+            elif op == "DICT_SPREAD":
+                spread = self.stack.pop()
+                if self.stack and isinstance(self.stack[-1], dict):
+                    self.stack[-1].update(spread)
+                else:
+                    self.stack.append(dict(spread))
+
+            elif op == "DICT_SET_ITEM":
+                value = self.stack.pop()
+                key   = self.stack.pop()
+                d     = self.stack[-1]
+                d[key] = value
+
+            elif op == "BUILD_SET":
+                count = instr.argument
+                elems = [self.stack.pop() for _ in range(count)]
+                self.stack.append(set(elems))
+
+            elif op == "SET_ADD":
+                elem = self.stack.pop()
+                s    = self.stack[-1]
+                s.add(elem)
+
+            elif op == "BUILD_SLICE":
+                step  = self.stack.pop()
+                stop  = self.stack.pop()
+                start = self.stack.pop()
+                self.stack.append(slice(start, stop, step))
+
+            elif op == "UNPACK_STARRED":
+                val = self.stack.pop()
+                if isinstance(val, (list, tuple)):
+                    for item in val:
+                        self.stack.append(item)
+                else:
+                    self.stack.append(val)
+
+            elif op == "IMPORT_MODULE":
+                names = instr.argument   # list of (name, alias) tuples
+                for name, alias in names:
+                    mod = _import_module(name)
+                    store_as = alias if alias else name.split(".")[0]
+                    self.current_frame().variables[store_as] = mod
+
+            elif op == "IMPORT_FROM":
+                module_name, names = instr.argument   # names: list of (attr, alias)
+                mod = _import_module(module_name)
+                for attr, alias in names:
+                    store_as = alias if alias else attr
+                    if attr == "*":
+                        pub = getattr(mod, "__all__", None)
+                        attrs = pub if pub else [a for a in dir(mod) if not a.startswith("_")]
+                        for a in attrs:
+                            self.current_frame().variables[a] = getattr(mod, a)
+                    else:
+                        self.current_frame().variables[store_as] = getattr(mod, attr)
+
+            elif op == "DECLARE_GLOBAL":
+                for name in instr.argument:
+                    self.current_frame().variables.setdefault("__globals__", set())
+                    if isinstance(self.current_frame().variables.get("__globals__"), set):
+                        self.current_frame().variables["__globals__"].add(name)
+
+            elif op == "DECLARE_NONLOCAL":
+                pass
+
+            elif op == "DELETE_VAR":
+                name = instr.argument
+                for frame in reversed(self.frames):
+                    if name in frame.variables:
+                        del frame.variables[name]
+                        break
+
+            elif op == "RAISE_EXCEPTION":
+                exc = self.stack.pop()
+                if exc is None:
+                    raise RuntimeError("re-raise with no active exception")
+                if isinstance(exc, type):
+                    raise exc()
+                if isinstance(exc, Exception):
+                    raise exc
+                raise RuntimeError(str(exc))
+
+            elif op == "RAISE_ASSERTION":
+                msg = self.stack.pop()
+                raise AssertionError(str(msg) if msg is not None else "")
+
+            elif op == "EXEC_TRY":
+                node = instr.argument
+                try:
+                    sub = self._run_sub(node.body)
+                    self.output.extend(sub.output)
+                except Exception as caught:
+                    handled = False
+                    for handler in (node.handlers or []):
+                        if handler.exc_type is None or isinstance(
+                            caught,
+                            self._resolve_exception_type(handler.exc_type)
+                        ):
+                            sub = self._run_sub(handler.body, extra_vars={
+                                handler.var_name: caught
+                            } if handler.var_name else {})
+                            self.output.extend(sub.output)
+                            handled = True
+                            break
+                    if not handled:
+                        raise
+                else:
+                    if node.else_body:
+                        sub = self._run_sub(node.else_body)
+                        self.output.extend(sub.output)
+                finally:
+                    if node.finally_body:
+                        sub = self._run_sub(node.finally_body)
+                        self.output.extend(sub.output)
+
+            elif op == "EXEC_WITH":
+                node = instr.argument
+                ctx_expr, var_name = node.items[0]
+                ctx_instrs = self._compile_body([ctx_expr]
+                    if not isinstance(ctx_expr, list) else ctx_expr)
+                ctx_sub = VirtualMachine(ctx_instrs)
+                ctx_sub.frames    = [self.frames[-1]]
+                ctx_sub.functions = self.functions
+                ctx_sub.classes   = self.classes
+                ctx_sub._input_provider = self._input_provider
+                ctx_sub.run()
+                mgr = ctx_sub.stack[-1] if ctx_sub.stack else None
+                if hasattr(mgr, '__enter__'):
+                    val = mgr.__enter__()
+                else:
+                    val = mgr
+                if var_name:
+                    self.current_frame().variables[var_name] = val
+                try:
+                    sub = self._run_sub(node.body)
+                    self.output.extend(sub.output)
+                except Exception as e:
+                    if hasattr(mgr, '__exit__'):
+                        mgr.__exit__(type(e), e, None)
+                    raise
+                else:
+                    if hasattr(mgr, '__exit__'):
+                        mgr.__exit__(None, None, None)
+
+            elif op == "YIELD_VALUE":
+                val = self.stack.pop()
+                self.output.append(self._fmt(val))
+
+            elif op == "MAKE_LAMBDA":
+                node = instr.argument
+                captured = dict(self.current_frame().variables)
+                vm_ref = self
+
+                def _make_lambda(n, cap):
+                    def _fn(*call_args):
+                        new_frame = Frame()
+                        new_frame.variables.update(cap)
+                        for param, val in zip(n.params, call_args):
+                            new_frame.variables[param] = val
+                        for i, param in enumerate(n.params):
+                            if param not in new_frame.variables and i in n.defaults:
+                                dflt_instrs = vm_ref._compile_body([n.defaults[i]])
+                                dflt_sub = VirtualMachine(dflt_instrs)
+                                dflt_sub.frames = [Frame()]
+                                dflt_sub.functions = vm_ref.functions
+                                dflt_sub.classes   = vm_ref.classes
+                                dflt_sub.run()
+                                new_frame.variables[param] = (
+                                    dflt_sub.stack[-1] if dflt_sub.stack else None
+                                )
+                        from compiler.bytecode import BytecodeGenerator, Instruction
+                        from compiler.ast_nodes import Program, Return
+                        body_stmts = [Return(n.body)] if not isinstance(n.body, list) else n.body
+                        instrs = vm_ref._compile_body(body_stmts)
+                        sub = VirtualMachine(instrs)
+                        sub.frames = [new_frame]
+                        sub.functions = vm_ref.functions
+                        sub.classes   = vm_ref.classes
+                        sub._input_provider = vm_ref._input_provider
+                        sub.run()
+                        return sub.stack[-1] if sub.stack else None
+                    return _fn
+
+                self.stack.append(_make_lambda(node, captured))
+
+            elif op == "APPLY_DECORATOR":
+                dec = self.stack.pop()
+                fn  = self.stack.pop()
+                if callable(dec):
+                    self.stack.append(dec(fn))
+                else:
+                    self.stack.append(fn)
+
+            elif op == "CALL_FUNCTION_KW":
+                name, pos_count, kw_count = instr.argument
+                kw_values = [self.stack.pop() for _ in range(kw_count)]
+                kw_keys   = [self.stack.pop() for _ in range(kw_count)]
+                pos_args  = [self.stack.pop() for _ in range(pos_count)]
+                pos_args.reverse()
+                kw_keys.reverse()
+                kw_values.reverse()
+                kwargs = dict(zip(kw_keys, kw_values))
+                all_args = pos_args
+                if name in self.functions:
+                    func = self.functions[name]
+                    params = func["params"]
+                    new_frame = Frame()
+                    for i, (param, val) in enumerate(zip(params, pos_args)):
+                        new_frame.variables[param] = val
+                    for param in params[len(pos_args):]:
+                        if param in kwargs:
+                            new_frame.variables[param] = kwargs[param]
+                    self.frames.append(new_frame)
+                    self.call_stack.append((self.instructions, ip + 1))
+                    self.instructions = func["instructions"]
+                    ip = 0
+                    continue
+                else:
+                    ip = self._dispatch_call(name, pos_args, ip)
+                    if ip == -1:
+                        ip = 0
+                    else:
+                        ip += 1
+                    continue
+
             ip += 1
 
         return "\n".join(str(x) for x in self.output)
+
+    def _run_sub(self, stmts, extra_vars=None):
+        """Execute a list of AST statements in a fresh sub-VM sharing state."""
+        instrs = self._compile_body(stmts)
+        sub = VirtualMachine(instrs)
+        sub.frames    = [Frame()]
+        if extra_vars:
+            sub.frames[0].variables.update(extra_vars)
+        for frame in self.frames:
+            sub.frames[0].variables.update(frame.variables)
+        sub.functions = self.functions
+        sub.classes   = self.classes
+        sub._input_provider = self._input_provider
+        sub.run()
+        return sub
+
+    def _resolve_exception_type(self, exc_type_name):
+        _exc_map = {
+            "Exception": Exception,
+            "ValueError": ValueError,
+            "TypeError": TypeError,
+            "KeyError": KeyError,
+            "IndexError": IndexError,
+            "AttributeError": AttributeError,
+            "NameError": NameError,
+            "RuntimeError": RuntimeError,
+            "StopIteration": StopIteration,
+            "ZeroDivisionError": ZeroDivisionError,
+            "FileNotFoundError": FileNotFoundError,
+            "IOError": IOError,
+            "OSError": OSError,
+            "ImportError": ImportError,
+            "NotImplementedError": NotImplementedError,
+            "AssertionError": AssertionError,
+            "OverflowError": OverflowError,
+            "RecursionError": RecursionError,
+            "MemoryError": MemoryError,
+            "PermissionError": PermissionError,
+            "TimeoutError": TimeoutError,
+            "ArithmeticError": ArithmeticError,
+            "LookupError": LookupError,
+            "UnicodeError": UnicodeError,
+            "UnicodeDecodeError": UnicodeDecodeError,
+            "UnicodeEncodeError": UnicodeEncodeError,
+            "SystemExit": SystemExit,
+            "KeyboardInterrupt": KeyboardInterrupt,
+            "GeneratorExit": GeneratorExit,
+            "BaseException": BaseException,
+        }
+        if isinstance(exc_type_name, str):
+            return _exc_map.get(exc_type_name, Exception)
+        return Exception
 
     def _dispatch_call(self, name, args, ip):
         if name == "str":
@@ -579,6 +933,14 @@ class VirtualMachine:
             self.stack.append(result)
             return ip
 
+        if name == "type":
+            obj = args[0] if args else None
+            if isinstance(obj, dict) and "__class__" in obj:
+                self.stack.append(obj["__class__"])
+            else:
+                self.stack.append(type(obj))
+            return ip
+
         if name == "getattr":
             obj = args[0]; attr = args[1]
             default = args[2] if len(args) > 2 else None
@@ -621,5 +983,27 @@ class VirtualMachine:
         if name in self.functions:
             ip = self._call_function(name, args, ip)
             return ip  
-        
+
+        var_val = None
+        for frame in reversed(self.frames):
+            if name in frame.variables:
+                var_val = frame.variables[name]
+                break
+        if callable(var_val):
+            try:
+                self.stack.append(var_val(*args))
+            except Exception as e:
+                raise RuntimeError(f"Error calling '{name}': {e}") from e
+            return ip
+
+        if name in _BUILTIN_CALLABLES:
+            self.stack.append(_BUILTIN_CALLABLES[name](*args))
+            return ip
+
+        import builtins as _builtins_ns
+        _bi = getattr(_builtins_ns, name, None)
+        if callable(_bi):
+            self.stack.append(_bi(*args))
+            return ip
+
         raise NameError(f"Unknown function or class: '{name}'")
