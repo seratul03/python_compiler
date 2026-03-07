@@ -6,7 +6,8 @@ A full, multi-stage compilation pipeline for a Python-like language, paired with
 
 ## Features
 
-- **10-stage compiler pipeline** — Lexer → Parser → Semantic Analyzer → Optimizer → IR → Bytecode Generator → Virtual Machine + CFG & AST visualizers
+- **11-stage compiler pipeline** — Lexer → Parser → Semantic Analyzer → Optimizer → IR → Bytecode Generator → Virtual Machine + JIT + CFG & AST visualizers
+- **Threshold-based JIT compiler** — hot functions are transpiled to native Python and cached after 10 calls, bypassing the interpreter loop entirely; transparent fallback on unsupported constructs
 - **Web IDE** — Monaco Editor (the same editor used in VS Code) served via Flask
 - **Interactive debug visualizations** — collapsible, color-coded AST tree; CFG graph; disassembled bytecode
 - **Intermediate Representation (IR)** — three-address code stage for further analysis and optimization
@@ -46,6 +47,12 @@ Source Code
     ▼
  Virtual Machine      →  Frame-based execution; functions, classes,
                           built-ins, break/continue, __str__
+    │
+    ▼
+ JIT Compiler         →  Threshold-based (default: 10 calls); hot functions
+                          transpiled via PythonCodeGen → compile() → exec();
+                          cached callables bypass interpreter dispatch loop;
+                          transparent interpreter fallback on failure
 
  ─── Analysis stages (run in parallel) ───────────────────────────
  CFG Builder          →  Control Flow Graph (nodes + edges)
@@ -172,6 +179,51 @@ The language is a subset of Python. Supported constructs:
 
 ---
 
+## JIT Compiler
+
+PyFlux includes a threshold-based Just-In-Time compiler that speeds up frequently called functions by translating them to native CPython code at runtime.
+
+### How it works
+
+1. The VM tracks how many times each user-defined function is called.
+2. Once a function reaches the **call threshold (default: 10)**, its stored `FunctionDef` AST node is handed to `PythonCodeGen`.
+3. `PythonCodeGen` walks the AST and emits valid Python source code for the function.
+4. Python's built-in `compile()` + `exec()` turn that source into a real callable.
+5. The callable is **cached** in the JIT's internal cache. All future calls to that function bypass the VM's interpreter dispatch loop entirely and run at CPython native speed.
+6. If transpilation or execution ever fails, the VM **falls back to interpretation transparently** — the function is marked so JIT is never retried for it.
+
+### Supported constructs in JIT-compiled functions
+
+| Construct | JIT Support |
+|-----------|-------------|
+| Variables, augmented assignment | Yes |
+| Arithmetic, comparison, boolean ops | Yes |
+| `if / else` | Yes |
+| `while` loops | Yes |
+| `for ... in` loops | Yes |
+| `break`, `continue` | Yes |
+| `return` | Yes |
+| `print()` (routed via `__jit_print__`) | Yes |
+| Built-in calls (`len`, `range`, `int`, `str`, …) | Yes |
+| List literals, index access | Yes |
+| Attribute access & method calls | Yes |
+| List comprehensions | Yes |
+| Class instantiation, `super()` | Yes |
+
+### JIT stats
+
+`JITCompiler` exposes a `stats` dictionary after execution:
+
+```python
+jit.stats = {
+    "compiled": ["fib", "factorial"],   
+    "failed":   ["my_class_method"],    
+    "counts":   {"fib": 12, ...}        
+}
+```
+
+---
+
 ## Security
 
 Code is executed in a sandboxed subprocess with:
@@ -198,6 +250,7 @@ compiler/
 ├── bytecode.py           # Bytecode instruction emitter
 ├── disassembler.py       # Human-readable bytecode output
 ├── vm.py                 # Stack-based virtual machine
+├── jit.py                # Threshold-based JIT compiler (PythonCodeGen + JITCompiler)
 ├── cfg.py                # Control flow graph builder
 ├── ast_visualizer.py     # AST → JSON for UI rendering
 execution/

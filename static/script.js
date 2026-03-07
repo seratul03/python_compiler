@@ -1,7 +1,6 @@
 const outputBoxEl = document.getElementById("output");
 outputBoxEl.contentEditable = "false";
 
-// ── Theme toggle ─────────────────────────────────────────────────────
 
 function toggleTheme() {
     const isDark = document.body.getAttribute('data-theme') === 'dark';
@@ -26,7 +25,6 @@ let emptyPollCount = 0;
 let isWaitingForInput = false;
 let sessionOutput = "";
 
-// ── Building animation ────────────────────────────────────────────────
 const _buildingTimers = {};
 
 function showBuildingAnimation(sectionId, label) {
@@ -248,7 +246,6 @@ function resetCompiler() {
     editor.setValue("");
 }
 
-// ── AST Tree Renderer ────────────────────────────────────────────────
 
 function getASTNodeClass(label) {
     const type = label.split('(')[0];

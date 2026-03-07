@@ -9,8 +9,7 @@ from execution.runner import (
 )
 
 app = Flask(__name__)
-app.json.ensure_ascii = False  # preserve Unicode characters (e.g. ₹) in JSON responses
-
+app.json.ensure_ascii = False 
 
 @app.route("/")
 def home():

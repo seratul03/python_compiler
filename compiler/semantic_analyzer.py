@@ -31,6 +31,7 @@ class SemanticAnalyzer:
         self._loop_depth = 0
         self._functions = {}
         self._classes = {}
+        self._current_class = None 
 
     def _enter_scope(self):
         self._scopes.append(set())
@@ -46,7 +47,6 @@ class SemanticAnalyzer:
         return any(name in scope for scope in reversed(self._scopes))
 
     def visit(self, node):
-        """Dispatch to visit_<ClassName> or silently skip unknown nodes."""
         if node is None:
             return None
         method = getattr(self, f"visit_{type(node).__name__}", self._generic_visit)
@@ -245,11 +245,14 @@ class SemanticAnalyzer:
     def visit_ClassDef(self, node):
         self._classes[node.name] = node
         self._declare(node.name, "class")
+        prev_class = self._current_class
+        self._current_class = node.name
         self._enter_scope()
         self._declare("self", "instance")
         for stmt in node.body:
             self.visit(stmt)
         self._exit_scope()
+        self._current_class = prev_class
 
     def visit_AttributeAccess(self, node):
         if not self._is_declared(node.obj):
@@ -262,6 +265,20 @@ class SemanticAnalyzer:
             self.visit(arg)
 
     def visit_SuperMethodCall(self, node):
+        if node.explicit_class is not None:
+            cls_node = self._classes.get(node.explicit_class)
+            if cls_node is None:
+                raise SemanticError(f"super(): '{node.explicit_class}' is not a defined class")
+            if cls_node.parent is None:
+                raise SemanticError(
+                    f"super(): class '{node.explicit_class}' has no parent class"
+                )
+        elif self._current_class is not None:
+            cls_node = self._classes.get(self._current_class)
+            if cls_node is not None and cls_node.parent is None:
+                raise SemanticError(
+                    f"super(): class '{self._current_class}' has no parent class"
+                )
         for arg in node.args:
             self.visit(arg)
 

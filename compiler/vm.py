@@ -121,14 +121,14 @@ class VirtualMachine:
     def _instance_str(self, obj):
         if not (isinstance(obj, dict) and "__class__" in obj):
             return None
-        method_node, _ = self._find_method(obj["__class__"], "__str__")
+        method_node, found_class = self._find_method(obj["__class__"], "__str__")
         if method_node is None:
             class_name = obj.get("__class__", "object")
             return f"<{class_name} object>"
         method_instructions = self._compile_body(method_node.body)
         new_frame = Frame()
         new_frame.variables["self"] = obj
-        new_frame.variables["__current_class__"] = obj.get("__class__", "")
+        new_frame.variables["__current_class__"] = found_class or obj.get("__class__", "")
         sub_vm = VirtualMachine(method_instructions)
         sub_vm.frames    = [new_frame]
         sub_vm.functions = self.functions
@@ -138,17 +138,19 @@ class VirtualMachine:
         result = sub_vm.stack[-1] if sub_vm.stack else ""
         return str(result)
 
-    def _call_method_node(self, method_node, obj, args, ip):
+    def _call_method_node(self, method_node, obj, args, ip, class_name=None):
         method_instructions = self._compile_body(method_node.body)
         new_frame = Frame()
         new_frame.variables["self"] = obj
-        new_frame.variables["__current_class__"] = obj.get("__class__", "")
+        new_frame.variables["__current_class__"] = (
+            class_name if class_name is not None else obj.get("__class__", "")
+        )
         for param, val in zip(method_node.params[1:], args):
             new_frame.variables[param] = val
         self.frames.append(new_frame)
         self.call_stack.append((self.instructions, ip + 1))
         self.instructions = method_instructions
-        return -1 
+        return -1
 
     def _jit_print(self, *args):
         self.output.append(" ".join(self._fmt(v) for v in args))
@@ -391,31 +393,37 @@ class VirtualMachine:
                     raise TypeError(
                         f"Cannot call method '{method_name}' on {type(obj).__name__}"
                     )
-                method_node, _ = self._find_method(obj["__class__"], method_name)
+                method_node, found_class = self._find_method(obj["__class__"], method_name)
                 if method_node is None:
                     raise AttributeError(
                         f"Class '{obj['__class__']}' has no method '{method_name}'"
                     )
-                ip = self._call_method_node(method_node, obj, args, ip)
+                ip = self._call_method_node(method_node, obj, args, ip, class_name=found_class)
                 ip = 0
                 continue
             elif op == "CALL_SUPER_METHOD":
-                method_name, arg_count = instr.argument
+                instr_arg = instr.argument
+                if len(instr_arg) == 3:
+                    method_name, arg_count, explicit_class = instr_arg
+                else:
+                    method_name, arg_count = instr_arg
+                    explicit_class = None
                 args = [self.stack.pop() for _ in range(arg_count)]
                 args.reverse()
                 self_obj = self.current_frame().variables.get("self")
                 current_class = self.current_frame().variables.get(
                     "__current_class__", self_obj.get("__class__", "") if self_obj else ""
                 )
-                parent_name = getattr(self.classes.get(current_class), "parent", None)
+                lookup_root = explicit_class if explicit_class else current_class
+                parent_name = getattr(self.classes.get(lookup_root), "parent", None)
                 if not parent_name:
-                    raise Exception(f"Class '{current_class}' has no parent for super()")
-                method_node, _ = self._find_method(parent_name, method_name)
+                    raise Exception(f"Class '{lookup_root}' has no parent for super()")
+                method_node, found_class = self._find_method(parent_name, method_name)
                 if method_node is None:
                     raise AttributeError(
                         f"Parent class '{parent_name}' has no method '{method_name}'"
                     )
-                ip = self._call_method_node(method_node, self_obj, args, ip)
+                ip = self._call_method_node(method_node, self_obj, args, ip, class_name=found_class)
                 ip = 0
                 continue
 
@@ -592,12 +600,12 @@ class VirtualMachine:
 
         if name in self.classes:
             instance = {"__class__": name, "__attributes__": {}}
-            init_node, _ = self._find_method(name, "__init__")
+            init_node, init_class = self._find_method(name, "__init__")
             if init_node:
                 init_instrs = self._compile_body(init_node.body)
                 new_frame   = Frame()
                 new_frame.variables["self"] = instance
-                new_frame.variables["__current_class__"] = name
+                new_frame.variables["__current_class__"] = init_class or name
                 for param, val in zip(init_node.params[1:], args):
                     new_frame.variables[param] = val
                 sub_vm = VirtualMachine(init_instrs)

@@ -45,7 +45,6 @@ class UnaryOp(ASTNode):
 
 
 class BoolOp(ASTNode):
-    """and / or"""
     def __init__(self, operator, left, right):
         self.operator = operator 
         self.left = left
@@ -59,7 +58,6 @@ class Assignment(ASTNode):
 
 
 class AttributeAssignment(ASTNode):
-    """obj.attr = value"""
     def __init__(self, obj, attr, value):
         self.obj = obj     
         self.attr = attr   
@@ -134,7 +132,6 @@ class ForLoop(ASTNode):
 
 
 class ForInLoop(ASTNode):
-    """for var in iterable:"""
     def __init__(self, var_name, iterable, body):
         self.var_name = var_name
         self.iterable = iterable
@@ -142,7 +139,6 @@ class ForInLoop(ASTNode):
 
 
 class RangeExpr(ASTNode):
-    """range(start, stop[, step])"""
     def __init__(self, start, stop, step):
         self.start = start    
         self.stop = stop      
@@ -150,7 +146,6 @@ class RangeExpr(ASTNode):
 
 
 class ListComprehension(ASTNode):
-    """[expr for var in iterable [if cond]]"""
     def __init__(self, expr, var_name, iterable, condition=None):
         self.expr = expr
         self.var_name = var_name
@@ -186,14 +181,13 @@ class MethodCall(ASTNode):
 
 
 class SuperMethodCall(ASTNode):
-    """super().method(args) — calls parent-class method with self"""
-    def __init__(self, method, args):
+    def __init__(self, method, args, explicit_class=None):
         self.method = method
         self.args = args
+        self.explicit_class = explicit_class
 
 
 class MethodCallExpr(ASTNode):
-    """method call on an arbitrary expression (not just a variable name)"""
     def __init__(self, obj_expr, method, args):
         self.obj_expr = obj_expr  
         self.method = method
@@ -201,14 +195,12 @@ class MethodCallExpr(ASTNode):
 
 
 class AttributeAccessExpr(ASTNode):
-    """attribute access on an arbitrary expression"""
     def __init__(self, obj_expr, attr):
         self.obj_expr = obj_expr
         self.attr = attr
 
 
 class ExprSubscript(ASTNode):
-    """subscript on arbitrary expression: expr[index]  (e.g. self.items[i])"""
     def __init__(self, obj_expr, index):
         self.obj_expr = obj_expr
         self.index = index
@@ -227,13 +219,11 @@ class Pass(ASTNode):
 
 
 class ExprStatement(ASTNode):
-    """Wraps an expression used as a bare statement so its result is discarded (POP_TOP)."""
     def __init__(self, expr):
         self.expr = expr
 
 
 class AugmentedAssignment(ASTNode):
-    """name op= value  (e.g. x += 1)"""
     def __init__(self, name, operator, value):
         self.name = name        
         self.operator = operator
@@ -241,7 +231,6 @@ class AugmentedAssignment(ASTNode):
 
 
 class AttributeAugAssignment(ASTNode):
-    """obj.attr op= value  (e.g. self.count += 1)"""
     def __init__(self, obj, attr, operator, value):
         self.obj = obj
         self.attr = attr
@@ -250,7 +239,6 @@ class AttributeAugAssignment(ASTNode):
 
 
 class IndexAugAssignment(ASTNode):
-    """name[index] op= value  (e.g. arr[i] += 1)"""
     def __init__(self, name, index, operator, value):
         self.name = name
         self.index = index
@@ -259,28 +247,23 @@ class IndexAugAssignment(ASTNode):
 
 
 class TupleLiteral(ASTNode):
-    """(a, b, ...)  tuple literal"""
     def __init__(self, elements):
         self.elements = elements
 
 
 class UnpackAssignment(ASTNode):
-    """a, b = expr  (tuple unpacking assignment)"""
     def __init__(self, names, value):
-        self.names = names   # list of str
+        self.names = names  
         self.value = value
 
 
 class ChainedIndexAssignment(ASTNode):
-    """name[i][j] = value  (chained subscript assignment)"""
     def __init__(self, name, indices, value):
-        self.name = name        # str
-        self.indices = indices  # list of ASTNode
+        self.name = name       
+        self.indices = indices 
         self.value = value
 
 
 class FStringExpr(ASTNode):
-    """f"..." — parts is a list of String nodes (literal text) or
-    (expr_node, format_spec_str_or_None) tuples (interpolated expressions)."""
     def __init__(self, parts):
         self.parts = parts

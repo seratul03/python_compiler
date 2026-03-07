@@ -2,12 +2,10 @@ import re
 
 
 def _is_hex(s):
-    """Return True if s is a non-empty string of hexadecimal digits."""
     return len(s) > 0 and all(c in '0123456789abcdefABCDEF' for c in s)
 
 
 def _unescape_string(s):
-    """Process escape sequences in a string literal, including Unicode escapes."""
     import unicodedata
     result = []
     i = 0
@@ -142,7 +140,6 @@ def tokenize(code):
     indent_stack = [0]
     code = code.replace("\r", "")
 
-    # Pre-process: collapse triple-quoted strings to "" preserving line count
     def _replace_tq(m):
         newlines = m.group(0).count('\n')
         return '""' + '\n' * newlines
@@ -210,8 +207,6 @@ def tokenize(code):
                 tokens.append(Token("STRING", _unescape_string(value[1:-1]), line_num, pos))
 
             elif kind == "IDENT":
-                # Extend past Unicode combining/continuation chars (e.g. Devanagari
-                # vowel signs) that re's \w misses, using Python's own identifier rules.
                 end = pos + len(value)
                 while end < len(stripped) and (value + stripped[end]).isidentifier():
                     value += stripped[end]

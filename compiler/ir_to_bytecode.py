@@ -8,8 +8,6 @@ class IRToBytecodeConverter:
         self.labels = {}
 
     def first_pass(self):
-        """Count the actual number of bytecode instructions emitted per IR
-        instruction so that label targets resolve to the correct positions."""
         position = 0
         for instr in self.ir_code:
             if instr.op == "LABEL":
@@ -110,7 +108,6 @@ class IRToBytecodeConverter:
                 )
 
             elif instr.op == "DEFINE_FUNCTION":
-                # Pass the AST node so the VM can inline the body when called.
                 self.bytecode.append(
                     Instruction("DEFINE_FUNCTION", instr.arg2)
                 )

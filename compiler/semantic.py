@@ -2,7 +2,6 @@ class SemanticError(Exception):
     pass
 
 
-# Functions and names that are always available without declaration
 BUILTIN_NAMES = {
     "len", "input", "int", "float", "str", "bool", "abs", "round",
     "range", "list", "tuple", "set", "dict", "map", "enumerate",
@@ -18,12 +17,9 @@ class SemanticAnalyzer:
         self.scopes = [dict.fromkeys(BUILTIN_NAMES, True)]
         self.functions = {}
         self.classes   = {}
+        self._current_class = None
         self.current_function = None
         self._in_loop = 0
-
-    # ------------------------------------------------------------------ #
-    # Scope helpers
-    # ------------------------------------------------------------------ #
 
     def enter_scope(self):
         self.scopes.append({})
@@ -40,10 +36,6 @@ class SemanticAnalyzer:
                 return True
         return False
 
-    # ------------------------------------------------------------------ #
-    # Visitor dispatcher
-    # ------------------------------------------------------------------ #
-
     def visit(self, node):
         if node is None:
             return
@@ -51,20 +43,11 @@ class SemanticAnalyzer:
         return method(node)
 
     def _visit_noop(self, node):
-        # Unrecognised node — silently ignore (forward-compat)
         pass
-
-    # ------------------------------------------------------------------ #
-    # Program
-    # ------------------------------------------------------------------ #
 
     def visit_Program(self, node):
         for stmt in node.statements:
             self.visit(stmt)
-
-    # ------------------------------------------------------------------ #
-    # Literals — no checks needed
-    # ------------------------------------------------------------------ #
 
     def visit_Number(self, node):      pass
     def visit_Float(self, node):       pass
@@ -72,10 +55,6 @@ class SemanticAnalyzer:
     def visit_BoolLiteral(self, node): pass
     def visit_NoneLiteral(self, node): pass
     def visit_Pass(self, node):        pass
-
-    # ------------------------------------------------------------------ #
-    # Variables
-    # ------------------------------------------------------------------ #
 
     def visit_Variable(self, node):
         if not self.is_declared(node.name):
@@ -86,12 +65,7 @@ class SemanticAnalyzer:
         self.declare(node.name)
 
     def visit_AttributeAssignment(self, node):
-        # self.x = ... is always valid inside a method
         self.visit(node.value)
-
-    # ------------------------------------------------------------------ #
-    # Operators
-    # ------------------------------------------------------------------ #
 
     def visit_BinaryOp(self, node):
         self.visit(node.left)
@@ -108,17 +82,9 @@ class SemanticAnalyzer:
         self.visit(node.left)
         self.visit(node.right)
 
-    # ------------------------------------------------------------------ #
-    # Print
-    # ------------------------------------------------------------------ #
-
     def visit_Print(self, node):
         for v in node.values:
             self.visit(v)
-
-    # ------------------------------------------------------------------ #
-    # Control flow
-    # ------------------------------------------------------------------ #
 
     def visit_IfStatement(self, node):
         self.visit(node.condition)
@@ -242,11 +208,14 @@ class SemanticAnalyzer:
     def visit_ClassDef(self, node):
         self.classes[node.name] = node
         self.declare(node.name)
+        prev_class = self._current_class
+        self._current_class = node.name
         self.enter_scope()
         self.declare("self")
         for stmt in node.body:
             self.visit(stmt)
         self.exit_scope()
+        self._current_class = prev_class
 
     def visit_AttributeAccess(self, node):
         if not self.is_declared(node.obj):
@@ -259,6 +228,20 @@ class SemanticAnalyzer:
             self.visit(arg)
 
     def visit_SuperMethodCall(self, node):
+        if node.explicit_class is not None:
+            cls_node = self.classes.get(node.explicit_class)
+            if cls_node is None:
+                raise SemanticError(f"super(): '{node.explicit_class}' is not a defined class")
+            if cls_node.parent is None:
+                raise SemanticError(
+                    f"super(): class '{node.explicit_class}' has no parent class"
+                )
+        elif self._current_class is not None:
+            cls_node = self.classes.get(self._current_class)
+            if cls_node is not None and cls_node.parent is None:
+                raise SemanticError(
+                    f"super(): class '{self._current_class}' has no parent class"
+                )
         for arg in node.args:
             self.visit(arg)
 

@@ -14,7 +14,6 @@
     --shadow-soft: 0 10px 25px rgba(0, 0, 0, 0.05);
 }
 
-/* PAGE BACKGROUND */
 
 body {
     margin: 0;
@@ -36,7 +35,6 @@ body {
     box-sizing: border-box;
 }
 
-/* MAIN APP */
 
 .app-container {
     width: 100%;
@@ -59,7 +57,6 @@ body {
     overflow: hidden;
 }
 
-/* HEADER */
 
 .app-header {
     display: flex;
@@ -83,7 +80,6 @@ body {
     letter-spacing: -0.01em;
 }
 
-/* BUTTONS */
 
 .run-btn {
     background: linear-gradient(135deg, #2563EB, #3B82F6);
@@ -110,7 +106,6 @@ body {
     box-shadow: 0 10px 18px rgba(37, 99, 235, 0.25);
 }
 
-/* WORKSPACE */
 
 .workspace {
     display: flex;
@@ -125,7 +120,6 @@ body {
     }
 }
 
-/* EDITOR */
 
 .editor-pane {
     flex: 2;
@@ -141,7 +135,6 @@ body {
     inset: 0;
 }
 
-/* OUTPUT PANEL */
 
 .output-pane {
     flex: 1;
@@ -151,7 +144,6 @@ body {
     background: var(--output-bg);
 }
 
-/* TAB BAR */
 
 .tab-bar {
     display: flex;
@@ -193,7 +185,6 @@ body {
     font-weight: 500;
 }
 
-/* OUTPUT */
 
 #output {
     padding: 16px;
@@ -212,7 +203,6 @@ body {
     white-space: pre-wrap;
 }
 
-/* TAB CONTENT */
 
 .tab-content {
     display: none;
@@ -231,7 +221,6 @@ body {
     display: block;
 }
 
-/* INPUT ROW */
 
 #input-row {
     display: none;
@@ -280,7 +269,6 @@ body {
     cursor: pointer;
 }
 
-/* MONACO MENU */
 
 .monaco-menu {
     border-radius: 8px !important;
@@ -293,9 +281,6 @@ body {
     background: #EEF2FF !important;
 }
 
-/* ── AST Tree Visual ─────────────────────────────────────────── */
-
-/* The AST tab uses HTML, not plain text */
 #ast { white-space: normal; padding: 12px 16px; }
 
 .ast-tree {
@@ -314,7 +299,6 @@ body {
     padding: 0;
 }
 
-/* Children group: indent + vertical guide line */
 .ast-tree ul ul {
     margin-left: 10px;
     padding-left: 14px;
@@ -322,13 +306,11 @@ body {
     gap: 12px;
 }
 
-/* Each non-root item */
 .ast-tree ul ul > li {
     position: relative;
     padding: 3px 0;
 }
 
-/* Horizontal connector from guide to node */
 .ast-tree ul ul > li::before {
     content: '';
     position: absolute;
@@ -341,7 +323,6 @@ body {
     z-index: 0;
 }
 
-/* Clip the guide-line tail below the last child */
 .ast-tree ul ul > li:last-child::after {
     content: '';
     position: absolute;
@@ -353,7 +334,6 @@ body {
     z-index: 1;
 }
 
-/* ── Node badge ── */
 .ast-node {
     display: inline-flex;
     align-items: center;
@@ -389,10 +369,8 @@ body {
     transition: background 0.12s, transform 0.12s;
 }
 
-/* Collapsed: hide child list */
 .ast-collapsed > ul { display: none; }
 
-/* ── Node type colour palette ── */
 .ast-root    { background: #EEF2FF; color: #4338CA; border-color: #C7D2FE; }
 .ast-literal { background: #ECFDF5; color: #059669; border-color: #A7F3D0; }
 .ast-var     { background: #F0F9FF; color: #0369A1; border-color: #BAE6FD; }
@@ -401,7 +379,6 @@ body {
 .ast-func    { background: #EFF6FF; color: #1D4ED8; border-color: #BFDBFE; }
 .ast-other   { background: #F8FAFC; color: #475569; border-color: #E2E8F0; }
 
-/* custom editor menu */
 
 #editor-menu{
     position:absolute;
@@ -428,7 +405,6 @@ body {
     background:#EEF2FF;
 }
 
-/* ── Building Animation ─────────────────────────────────────── */
 
 .building-anim {
     display: flex;
@@ -453,10 +429,6 @@ body {
     text-align: left;
 }
 
-/* ══════════════════════════════════════════════════════════════
-   DARK THEME  —  "Deep Ocean"
-   Unique deep-ocean bioluminescent palette (not VS Code)
-   ══════════════════════════════════════════════════════════════ */
 
 body[data-theme="dark"] {
     --bg-color:       #060E1A;
@@ -478,7 +450,6 @@ body[data-theme="dark"] {
     color: var(--text-main);
 }
 
-/* App Container */
 body[data-theme="dark"] .app-container {
     background: rgba(10, 20, 36, 0.96);
     border-color: var(--border-color);
@@ -487,7 +458,6 @@ body[data-theme="dark"] .app-container {
         inset 0 1px 0 rgba(0, 200, 180, 0.04);
 }
 
-/* Header */
 body[data-theme="dark"] .app-header {
     background: linear-gradient(to bottom, #0E1E34, #0A1828);
     border-bottom-color: var(--border-color);
@@ -497,7 +467,6 @@ body[data-theme="dark"] .app-header h2 {
     color: #C2D8F0;
 }
 
-/* Run / Reset buttons */
 body[data-theme="dark"] .run-btn {
     background: linear-gradient(135deg, #00BFA8, #009E8E);
     box-shadow: 0 6px 12px rgba(0, 200, 180, 0.22);
@@ -507,13 +476,11 @@ body[data-theme="dark"] .run-btn:hover {
     box-shadow: 0 10px 18px rgba(0, 200, 180, 0.34);
 }
 
-/* Editor pane */
 body[data-theme="dark"] .editor-pane {
     background: #04101C;
     border-right-color: var(--border-color);
 }
 
-/* Output pane + tab bar */
 body[data-theme="dark"] .tab-bar {
     background: #0A1828;
     border-bottom-color: var(--border-color);
@@ -533,7 +500,6 @@ body[data-theme="dark"] .tab-btn.active {
     color: #00DCC0;
 }
 
-/* Tab content areas */
 body[data-theme="dark"] .tab-content {
     color: var(--text-main);
 }
@@ -542,7 +508,6 @@ body[data-theme="dark"] #output {
     color: #C2D8F0;
 }
 
-/* Input row */
 body[data-theme="dark"] #input-row {
     background: #0A1828;
     border-top-color: var(--border-color);
@@ -562,7 +527,6 @@ body[data-theme="dark"] #input-row button {
     background: #00BFA8;
 }
 
-/* Custom editor context menu */
 body[data-theme="dark"] #editor-menu {
     background: #0C1A2E;
     border-color: #1E3450;
@@ -574,7 +538,6 @@ body[data-theme="dark"] .menu-item:hover {
     background: #102840;
 }
 
-/* ── AST tree connectors ── */
 body[data-theme="dark"] .ast-tree ul ul {
     border-left-color: #1C3450;
 }
@@ -587,7 +550,6 @@ body[data-theme="dark"] .ast-tree ul ul > li:last-child::after {
     background: var(--output-bg);
 }
 
-/* ── AST node colour palette (dark) ── */
 body[data-theme="dark"] .ast-root    { background: #0A1040; color: #818CF8; border-color: #1E2870; }
 body[data-theme="dark"] .ast-literal { background: #021C0E; color: #10DDA0; border-color: #033C1E; }
 body[data-theme="dark"] .ast-var     { background: #031C30; color: #00C8E0; border-color: #063850; }
@@ -596,7 +558,6 @@ body[data-theme="dark"] .ast-control { background: #180428; color: #C084FC; bord
 body[data-theme="dark"] .ast-func    { background: #041028; color: #5BA8FB; border-color: #0A2250; }
 body[data-theme="dark"] .ast-other   { background: #0A1220; color: #5A7A96; border-color: #162432; }
 
-/* ── Toggle switch (moon / sun) ── */
 .switch {
     font-size: 13px;
     position: relative;
@@ -660,14 +621,6 @@ body[data-theme="dark"] .ast-other   { background: #0A1220; color: #5A7A96; bord
     opacity: 0;
 }
 
-/* .cloud {
-    width: 3.5em;
-    position: absolute;
-    bottom: -1.4em;
-    left: -1.1em;
-    opacity: 0;
-    transition: all 0.4s;
-} */
 
 .switch input:checked ~ .slider .cloud {
     opacity: 1;

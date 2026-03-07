@@ -13,14 +13,10 @@ class Instruction:
 class BytecodeGenerator:
     def __init__(self):
         self.instructions = []
-        # stacks of lists of instruction indices that need patching
-        self.break_targets = []     # for BREAK inside loops
-        self.continue_targets = []  # for CONTINUE inside loops
-        self._counter = 0           # unique temp-variable counter
+        self.break_targets = []     
+        self.continue_targets = []  
+        self._counter = 0           
 
-    # ------------------------------------------------------------------ #
-    # Public entry point
-    # ------------------------------------------------------------------ #
 
     def generate(self, node):
         method_name = f"visit_{type(node).__name__}"
@@ -36,18 +32,10 @@ class BytecodeGenerator:
         self._counter += 1
         return self._counter
 
-    # ------------------------------------------------------------------ #
-    # Program
-    # ------------------------------------------------------------------ #
-
     def visit_Program(self, node):
         for stmt in node.statements:
             self.generate(stmt)
         return self.instructions
-
-    # ------------------------------------------------------------------ #
-    # Literals
-    # ------------------------------------------------------------------ #
 
     def visit_Number(self, node):
         self.instructions.append(Instruction("LOAD_CONST", node.value))
@@ -64,10 +52,6 @@ class BytecodeGenerator:
     def visit_NoneLiteral(self, node):
         self.instructions.append(Instruction("LOAD_CONST", None))
 
-    # ------------------------------------------------------------------ #
-    # Variables
-    # ------------------------------------------------------------------ #
-
     def visit_Variable(self, node):
         self.instructions.append(Instruction("LOAD_VAR", node.name))
 
@@ -79,10 +63,6 @@ class BytecodeGenerator:
         self.instructions.append(Instruction("LOAD_VAR", node.obj))
         self.generate(node.value)
         self.instructions.append(Instruction("STORE_ATTR", node.attr))
-
-    # ------------------------------------------------------------------ #
-    # Operators
-    # ------------------------------------------------------------------ #
 
     def visit_BinaryOp(self, node):
         self.generate(node.left)
@@ -118,18 +98,10 @@ class BytecodeGenerator:
         self.generate(node.right)
         self.instructions.append(Instruction("COMPARE", node.operator))
 
-    # ------------------------------------------------------------------ #
-    # Print
-    # ------------------------------------------------------------------ #
-
     def visit_Print(self, node):
         for val in node.values:
             self.generate(val)
         self.instructions.append(Instruction("PRINT", len(node.values)))
-
-    # ------------------------------------------------------------------ #
-    # Control flow
-    # ------------------------------------------------------------------ #
 
     def visit_IfStatement(self, node):
         self.generate(node.condition)
@@ -164,7 +136,7 @@ class BytecodeGenerator:
         for stmt in node.body:
             self.generate(stmt)
 
-        # continue → jump back to condition re-check
+
         continue_target = len(self.instructions)
         for idx in self.continue_targets.pop():
             self.instructions[idx].argument = continue_target
@@ -176,23 +148,19 @@ class BytecodeGenerator:
             self.instructions[idx].argument = len(self.instructions)
 
     def visit_Pass(self, node):
-        pass  # no instructions needed
+        pass  
 
     def visit_Break(self, node):
         if not self.break_targets:
             raise SyntaxError("'break' outside loop")
         self.break_targets[-1].append(len(self.instructions))
-        self.instructions.append(Instruction("JUMP", None))  # patched later
+        self.instructions.append(Instruction("JUMP", None))  
 
     def visit_Continue(self, node):
         if not self.continue_targets:
             raise SyntaxError("'continue' outside loop")
         self.continue_targets[-1].append(len(self.instructions))
-        self.instructions.append(Instruction("JUMP", None))  # patched later
-
-    # ------------------------------------------------------------------ #
-    # Legacy range-only for loop (kept for backward compat)
-    # ------------------------------------------------------------------ #
+        self.instructions.append(Instruction("JUMP", None))  
 
     def visit_ForLoop(self, node):
         self.generate(node.start)
@@ -226,10 +194,6 @@ class BytecodeGenerator:
         for idx in self.break_targets.pop():
             self.instructions[idx].argument = len(self.instructions)
 
-    # ------------------------------------------------------------------ #
-    # ForInLoop  — for var in iterable / range
-    # ------------------------------------------------------------------ #
-
     def visit_ForInLoop(self, node):
         uid = self._fresh()
         iter_var = f"__iter_{uid}__"
@@ -238,16 +202,11 @@ class BytecodeGenerator:
         if isinstance(node.iterable, RangeExpr):
             self._emit_range_for(node, iter_var, idx_var, uid)
         else:
-            # General iterable: evaluate, store, iterate by index
             self.generate(node.iterable)
             self.instructions.append(Instruction("STORE_VAR", iter_var))
             self._emit_index_loop(node.var_name, iter_var, idx_var, node.body)
 
     def _emit_range_for(self, node, iter_var, idx_var, uid):
-        """
-        Compile  for var in range(start, stop[, step]):
-        Into a step-based index loop using the range VM builtin.
-        """
         r = node.iterable
         self.generate(r.start)
         self.generate(r.stop)
@@ -260,14 +219,6 @@ class BytecodeGenerator:
         self._emit_index_loop(node.var_name, iter_var, idx_var, node.body)
 
     def _emit_index_loop(self, var_name, iter_var, idx_var, body):
-        """
-        Emit the while-index loop:
-            idx = 0
-            while idx < len(iter):
-                var = iter[idx]   (or unpack if var_name is a list)
-                <body>
-                idx += 1
-        """
         self.instructions.append(Instruction("LOAD_CONST", 0))
         self.instructions.append(Instruction("STORE_VAR", idx_var))
 
@@ -286,7 +237,6 @@ class BytecodeGenerator:
         self.instructions.append(Instruction("LOAD_INDEX"))
 
         if isinstance(var_name, list):
-            # Tuple unpacking: e.g. for i, v in enumerate(...)
             self.instructions.append(Instruction("UNPACK_SEQUENCE", len(var_name)))
             for vn in var_name:
                 self.instructions.append(Instruction("STORE_VAR", vn))
@@ -313,21 +263,15 @@ class BytecodeGenerator:
         for idx in self.break_targets.pop():
             self.instructions[idx].argument = len(self.instructions)
 
-    # ------------------------------------------------------------------ #
-    # List comprehension
-    # ------------------------------------------------------------------ #
-
     def visit_ListComprehension(self, node):
         uid = self._fresh()
         result_var = f"__comp_{uid}__"
         iter_var   = f"__citer_{uid}__"
         idx_var    = f"__cidx_{uid}__"
 
-        # result = []
         self.instructions.append(Instruction("BUILD_LIST", 0))
         self.instructions.append(Instruction("STORE_VAR", result_var))
 
-        # Evaluate iterable
         if isinstance(node.iterable, RangeExpr):
             r = node.iterable
             self.generate(r.start)
@@ -341,7 +285,6 @@ class BytecodeGenerator:
             self.generate(node.iterable)
         self.instructions.append(Instruction("STORE_VAR", iter_var))
 
-        # idx = 0
         self.instructions.append(Instruction("LOAD_CONST", 0))
         self.instructions.append(Instruction("STORE_VAR", idx_var))
 
@@ -355,7 +298,6 @@ class BytecodeGenerator:
         jump_false = len(self.instructions)
         self.instructions.append(Instruction("JUMP_IF_FALSE", None))
 
-        # var = iter[idx]
         self.instructions.append(Instruction("LOAD_VAR", iter_var))
         self.instructions.append(Instruction("LOAD_VAR", idx_var))
         self.instructions.append(Instruction("LOAD_INDEX"))
@@ -366,7 +308,6 @@ class BytecodeGenerator:
             skip_jump = len(self.instructions)
             self.instructions.append(Instruction("JUMP_IF_FALSE", None))
 
-            # result.append(expr)
             self.instructions.append(Instruction("LOAD_VAR", result_var))
             self.generate(node.expr)
             self.instructions.append(Instruction("LIST_APPEND"))
@@ -377,7 +318,6 @@ class BytecodeGenerator:
             self.generate(node.expr)
             self.instructions.append(Instruction("LIST_APPEND"))
 
-        # idx += 1
         self.instructions.append(Instruction("LOAD_VAR", idx_var))
         self.instructions.append(Instruction("LOAD_CONST", 1))
         self.instructions.append(Instruction("ADD"))
@@ -387,10 +327,6 @@ class BytecodeGenerator:
         self.instructions[jump_false].argument = len(self.instructions)
 
         self.instructions.append(Instruction("LOAD_VAR", result_var))
-
-    # ------------------------------------------------------------------ #
-    # Functions
-    # ------------------------------------------------------------------ #
 
     def visit_FunctionDef(self, node):
         self.instructions.append(Instruction("DEFINE_FUNCTION", node))
@@ -403,7 +339,6 @@ class BytecodeGenerator:
         )
 
     def visit_FStringExpr(self, node):
-        """Compile f-string: convert each part to a string, then concatenate all."""
         if not node.parts:
             self.instructions.append(Instruction("LOAD_CONST", ""))
             return
@@ -429,70 +364,46 @@ class BytecodeGenerator:
         self.generate(node.value)
         self.instructions.append(Instruction("RETURN_VALUE"))
 
-    # ------------------------------------------------------------------ #
-    # Expression statement  (result is discarded)
-    # ------------------------------------------------------------------ #
-
     def visit_ExprStatement(self, node):
         self.generate(node.expr)
         self.instructions.append(Instruction("POP_TOP"))
 
-    # ------------------------------------------------------------------ #
-    # Augmented assignments
-    # ------------------------------------------------------------------ #
-
     _AUG_OP_MAP = {"+": "ADD", "-": "SUB", "*": "MUL", "/": "DIV", "%": "MOD", "**": "POW", "//": "FLOORDIV"}
 
     def visit_AugmentedAssignment(self, node):
-        # name OP= value  →  name = name OP value
         self.instructions.append(Instruction("LOAD_VAR", node.name))
         self.generate(node.value)
         self.instructions.append(Instruction(self._AUG_OP_MAP[node.operator]))
         self.instructions.append(Instruction("STORE_VAR", node.name))
 
     def visit_AttributeAugAssignment(self, node):
-        # obj.attr OP= value  →  obj.attr = obj.attr OP value
-        # STORE_ATTR pops: top=value, next=obj  → push obj first, then value
         uid = self._fresh()
         tmp_val = f"__augattr_{uid}__"
-        # step 1: compute new value
         self.instructions.append(Instruction("LOAD_VAR", node.obj))
         self.instructions.append(Instruction("LOAD_ATTR", node.attr))
         self.generate(node.value)
         self.instructions.append(Instruction(self._AUG_OP_MAP[node.operator]))
-        # step 2: save new value to temp (so we can push obj first)
         self.instructions.append(Instruction("STORE_VAR", tmp_val))
-        # step 3: push obj, then value on top  (STORE_ATTR: pops value then obj)
         self.instructions.append(Instruction("LOAD_VAR", node.obj))
         self.instructions.append(Instruction("LOAD_VAR", tmp_val))
         self.instructions.append(Instruction("STORE_ATTR", node.attr))
 
     def visit_IndexAugAssignment(self, node):
-        # name[index] OP= value  (uses temp vars to evaluate index once)
         uid = self._fresh()
         tmp_idx = f"__augidx_{uid}__"
         tmp_val = f"__augval_{uid}__"
-        # compute and save the index
         self.generate(node.index)
         self.instructions.append(Instruction("STORE_VAR", tmp_idx))
-        # load current element value
         self.instructions.append(Instruction("LOAD_VAR", node.name))
         self.instructions.append(Instruction("LOAD_VAR", tmp_idx))
         self.instructions.append(Instruction("LOAD_INDEX"))
-        # apply operator with rhs
         self.generate(node.value)
         self.instructions.append(Instruction(self._AUG_OP_MAP[node.operator]))
-        # save new value to temp
         self.instructions.append(Instruction("STORE_VAR", tmp_val))
-        # push obj, index, new_value in the order STORE_INDEX expects
         self.instructions.append(Instruction("LOAD_VAR", node.name))
         self.instructions.append(Instruction("LOAD_VAR", tmp_idx))
         self.instructions.append(Instruction("LOAD_VAR", tmp_val))
         self.instructions.append(Instruction("STORE_INDEX"))
-
-    # ------------------------------------------------------------------ #
-    # Lists
-    # ------------------------------------------------------------------ #
 
     def visit_ListLiteral(self, node):
         for element in node.elements:
@@ -509,10 +420,6 @@ class BytecodeGenerator:
         self.generate(node.index)
         self.generate(node.value)
         self.instructions.append(Instruction("STORE_INDEX"))
-
-    # ------------------------------------------------------------------ #
-    # Classes and OOP
-    # ------------------------------------------------------------------ #
 
     def visit_ClassDef(self, node):
         self.instructions.append(Instruction("DEFINE_CLASS", node))
@@ -533,11 +440,10 @@ class BytecodeGenerator:
         for arg in node.args:
             self.generate(arg)
         self.instructions.append(
-            Instruction("CALL_SUPER_METHOD", (node.method, len(node.args)))
+            Instruction("CALL_SUPER_METHOD", (node.method, len(node.args), getattr(node, 'explicit_class', None)))
         )
 
     def visit_MethodCallExpr(self, node):
-        """Method call on an arbitrary expression (string literal, call result, etc.)"""
         self.generate(node.obj_expr)   
         for arg in node.args:
             self.generate(arg)
@@ -546,12 +452,10 @@ class BytecodeGenerator:
         )
 
     def visit_AttributeAccessExpr(self, node):
-        """Attribute access on an arbitrary expression."""
         self.generate(node.obj_expr)
         self.instructions.append(Instruction("LOAD_ATTR", node.attr))
 
     def visit_ExprSubscript(self, node):
-        """Subscript on arbitrary expression: expr[index]  e.g. self.items[i]"""
         self.generate(node.obj_expr)
         self.generate(node.index)
         self.instructions.append(Instruction("LOAD_INDEX"))
@@ -568,8 +472,6 @@ class BytecodeGenerator:
             self.instructions.append(Instruction("STORE_VAR", name))
 
     def visit_ChainedIndexAssignment(self, node):
-        # board[row][col] = v  →  load board, load row, LOAD_INDEX (gets row-list),
-        # then load col, load v, STORE_INDEX  (mutates the row-list in place)
         self.instructions.append(Instruction("LOAD_VAR", node.name))
         for idx in node.indices[:-1]:
             self.generate(idx)

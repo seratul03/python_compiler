@@ -6,10 +6,6 @@ class Parser:
         self.tokens = tokens
         self.pos = 0
 
-    # ------------------------------------------------------------------ #
-    # Helpers
-    # ------------------------------------------------------------------ #
-
     def current(self):
         if self.pos < len(self.tokens):
             return self.tokens[self.pos]
@@ -31,10 +27,6 @@ class Parser:
             f"(value={token.value if token else None}, line={token.line if token else '?'})"
         )
 
-    # ------------------------------------------------------------------ #
-    # Top level
-    # ------------------------------------------------------------------ #
-
     def parse(self):
         statements = []
         while self.current():
@@ -44,19 +36,13 @@ class Parser:
             statements.append(self.statement())
         return Program(statements)
 
-    # ------------------------------------------------------------------ #
-    # Statements
-    # ------------------------------------------------------------------ #
-
     def statement(self):
         token = self.current()
 
-        # pass
         if token.type == "PASS":
             self.eat("PASS")
             return Pass()
 
-        # bare string/fstring literal (docstring as no-op)
         if token.type == "STRING":
             self.eat("STRING")
             return Pass()
@@ -65,23 +51,19 @@ class Parser:
             self.eat("FSTRING")
             return Pass()
 
-        # break
         if token.type == "BREAK":
             self.eat("BREAK")
             return Break()
 
-        # continue
         if token.type == "CONTINUE":
             self.eat("CONTINUE")
             return Continue()
 
-        # print(a, b, ..., end="", sep=" ")
         if token.type == "PRINT":
             self.eat("PRINT")
             self.eat("LPAREN")
             values = []
             if self.current() and self.current().type != "RPAREN":
-                # skip leading keyword argument
                 if not (self.current().type == "IDENT" and self.peek() and self.peek().type == "ASSIGN"):
                     values.append(self.bool_expr())
                 while self.current() and self.current().type == "COMMA":
@@ -91,13 +73,12 @@ class Parser:
                     if self.current().type == "IDENT" and self.peek() and self.peek().type == "ASSIGN":
                         self.eat("IDENT")
                         self.eat("ASSIGN")
-                        self.bool_expr()  # discard keyword arg value
+                        self.bool_expr() 
                     else:
                         values.append(self.bool_expr())
             self.eat("RPAREN")
             return Print(values)
 
-        # def
         if token.type == "DEF":
             self.eat("DEF")
             name = self.eat("IDENT").value
@@ -108,7 +89,7 @@ class Parser:
                 params.append(param)
                 if self.current() and self.current().type == "ASSIGN":
                     self.eat("ASSIGN")
-                    self.bool_expr()  # parse and discard default value
+                    self.bool_expr()  
                 while self.current() and self.current().type == "COMMA":
                     self.eat("COMMA")
                     if self.current() and self.current().type == "RPAREN":
@@ -117,27 +98,23 @@ class Parser:
                     params.append(param)
                     if self.current() and self.current().type == "ASSIGN":
                         self.eat("ASSIGN")
-                        self.bool_expr()  # parse and discard default value
+                        self.bool_expr()
             self.eat("RPAREN")
             self.eat("COLON")
             body = self.block()
             return FunctionDef(name, params, body)
 
-        # return
         if token.type == "RETURN":
             self.eat("RETURN")
-            # allow bare return (no value)
             if self.current() and self.current().type not in ("NEWLINE", "DEDENT"):
                 value = self.bool_expr()
             else:
                 value = NoneLiteral()
             return Return(value)
 
-        # if / elif
         if token.type == "IF":
             return self._parse_if()
 
-        # while
         if token.type == "WHILE":
             self.eat("WHILE")
             condition = self.bool_expr()
@@ -145,11 +122,9 @@ class Parser:
             body = self.block()
             return WhileLoop(condition, body)
 
-        # for
         if token.type == "FOR":
             return self._parse_for()
 
-        # class
         if token.type == "CLASS":
             self.eat("CLASS")
             name = self.eat("IDENT").value
@@ -163,17 +138,12 @@ class Parser:
             body = self.block()
             return ClassDef(name, parent, body)
 
-        # IDENT-led statements: assignment, index-assign, attr-assign, bare call
         if token.type == "IDENT":
             return self._parse_ident_statement()
 
         raise Exception(
             f"Invalid statement: token {token.type}={token.value!r} at line {token.line}"
         )
-
-    # ------------------------------------------------------------------ #
-    # if / elif / else
-    # ------------------------------------------------------------------ #
 
     def _parse_if(self):
         self.eat("IF")
@@ -188,7 +158,6 @@ class Parser:
             elif_cond = self.bool_expr()
             self.eat("COLON")
             elif_body = self.block()
-            # build nested else_body tail
             elif_else = []
             if self.current() and self.current().type in ("ELIF", "ELSE"):
                 elif_else = self._parse_elif_tail()
@@ -218,22 +187,17 @@ class Parser:
             return self.block()
         return []
 
-    # ------------------------------------------------------------------ #
-    # for loop  — supports range(n), range(s,e), range(s,e,st), iterables
-    # ------------------------------------------------------------------ #
-
     def _parse_for(self):
         self.eat("FOR")
-        # Support single var or tuple unpacking:  for i in ...   or  for i, v in ...
         first_var = self.eat("IDENT").value
         if self.current() and self.current().type == "COMMA":
             var_names = [first_var]
             while self.current() and self.current().type == "COMMA":
                 self.eat("COMMA")
                 var_names.append(self.eat("IDENT").value)
-            var_name = var_names   # list signals unpacking
+            var_name = var_names  
         else:
-            var_name = first_var   # plain string = single variable
+            var_name = first_var  
         self.eat("IN")
 
         if self.current() and self.current().type == "RANGE":
@@ -259,11 +223,6 @@ class Parser:
         body = self.block()
         return ForInLoop(var_name, iterable, body)
 
-    # ------------------------------------------------------------------ #
-    # IDENT-led statements
-    # ------------------------------------------------------------------ #
-
-    # Mapping from augmented-assignment token types to their operators
     _AUG_OPS = {
         "PLUS_ASSIGN":  "+",
         "MINUS_ASSIGN": "-",
@@ -277,7 +236,6 @@ class Parser:
     def _parse_ident_statement(self):
         name = self.eat("IDENT").value
 
-        # a, b = expr  (tuple unpacking assignment)
         if self.current() and self.current().type == "COMMA":
             names = [name]
             while self.current() and self.current().type == "COMMA":
@@ -287,12 +245,10 @@ class Parser:
             value = self.bool_expr()
             return UnpackAssignment(names, value)
 
-        # obj.attr = value  (attribute assignment)  or  obj.method(args)
         if self.current() and self.current().type == "DOT":
             self.eat("DOT")
             attr = self.eat("IDENT").value
 
-            # Further chaining: obj.attr.method(...)  e.g. self.items.append(x)
             if self.current() and self.current().type == "DOT":
                 acc_node = AttributeAccess(name, attr)
                 self.eat("DOT")
@@ -302,19 +258,16 @@ class Parser:
                 self.eat("RPAREN")
                 return ExprStatement(MethodCallExpr(acc_node, method2, method_args))
 
-            # obj.attr = value  (plain attribute assignment)
             if self.current() and self.current().type == "ASSIGN":
                 self.eat("ASSIGN")
                 value = self.bool_expr()
                 return AttributeAssignment(name, attr, value)
 
-            # obj.attr OP= value  (augmented attribute assignment)
             if self.current() and self.current().type in self._AUG_OPS:
                 op = self._AUG_OPS[self.eat(self.current().type).type]
                 value = self.bool_expr()
                 return AttributeAugAssignment(name, attr, op, value)
 
-            # method call used as a statement: obj.method(...)
             if self.current() and self.current().type == "LPAREN":
                 self.eat("LPAREN")
                 args = self._arg_list()
@@ -322,7 +275,6 @@ class Parser:
                 return ExprStatement(MethodCall(name, attr, args))
             raise Exception(f"Expected assignment or call after {name}.{attr}")
 
-        # name[i]...[j] = value  or  name[i] OP= value
         if self.current() and self.current().type == "LBRACKET":
             self.eat("LBRACKET")
             indices = [self.bool_expr()]
@@ -341,35 +293,33 @@ class Parser:
                 return IndexAssignment(name, indices[0], value)
             return ChainedIndexAssignment(name, indices, value)
 
-        # name OP= value  (augmented variable assignment)
         if self.current() and self.current().type in self._AUG_OPS:
             op = self._AUG_OPS[self.eat(self.current().type).type]
             value = self.bool_expr()
             return AugmentedAssignment(name, op, value)
 
-        # name = value
         if self.current() and self.current().type == "ASSIGN":
             self.eat("ASSIGN")
             expr = self.bool_expr()
             return Assignment(name, expr)
 
-        # bare function call used as a statement: func(...)
         if self.current() and self.current().type == "LPAREN":
             self.eat("LPAREN")
             args = self._arg_list()
             self.eat("RPAREN")
 
-            # super().method(args) pattern
             if name == "super":
                 self.eat("DOT")
                 method = self.eat("IDENT").value
                 self.eat("LPAREN")
                 method_args = self._arg_list()
                 self.eat("RPAREN")
-                return ExprStatement(SuperMethodCall(method, method_args))
+                explicit_class = None
+                if args and hasattr(args[0], 'name'):
+                    explicit_class = args[0].name
+                return ExprStatement(SuperMethodCall(method, method_args, explicit_class))
 
             call = FunctionCall(name, args)
-            # Allow chaining: call().method(...)
             if self.current() and self.current().type == "DOT":
                 self.eat("DOT")
                 method = self.eat("IDENT").value
@@ -383,10 +333,6 @@ class Parser:
             f"Unexpected token after identifier '{name}': "
             f"{self.current().type if self.current() else 'EOF'}"
         )
-
-    # ------------------------------------------------------------------ #
-    # Block
-    # ------------------------------------------------------------------ #
 
     def block(self):
         statements = []
@@ -471,7 +417,6 @@ class Parser:
         return self.factor()
 
     def factor(self):
-        """Parse a primary expression and handle any trailing DOT-chains or subscripts."""
         node = self._primary()
         while self.current() and self.current().type in ("DOT", "LBRACKET"):
             if self.current().type == "DOT":
@@ -546,7 +491,6 @@ class Parser:
         )
 
     def _skip_newlines(self):
-        """Skip NEWLINE/INDENT/DEDENT — used inside multi-line list/tuple literals."""
         while self.current() and self.current().type in ("NEWLINE", "INDENT", "DEDENT"):
             self.pos += 1
 
@@ -584,7 +528,6 @@ class Parser:
         return ListLiteral(elements)
 
     def _parse_for_iterable(self):
-        """Parse the iterable in a for or comprehension — handles range(...)."""
         if self.current() and self.current().type == "RANGE":
             self.eat("RANGE")
             self.eat("LPAREN")
@@ -610,13 +553,17 @@ class Parser:
 
         if name == "super" and self.current() and self.current().type == "LPAREN":
             self.eat("LPAREN")
+            super_args = self._arg_list() 
             self.eat("RPAREN")
             self.eat("DOT")
             method = self.eat("IDENT").value
             self.eat("LPAREN")
             args = self._arg_list()
             self.eat("RPAREN")
-            return SuperMethodCall(method, args)
+            explicit_class = None
+            if super_args and hasattr(super_args[0], 'name'):
+                explicit_class = super_args[0].name
+            return SuperMethodCall(method, args, explicit_class)
 
         if self.current() and self.current().type == "LPAREN":
             self.eat("LPAREN")
@@ -639,11 +586,6 @@ class Parser:
         return Variable(name)
 
     def _parse_dot_chain(self, obj_node):
-        """
-        Handles  obj.attr  and  obj.method(args).
-        For a plain Variable receiver → MethodCall / AttributeAccess (keep string name).
-        For any other expression → MethodCallExpr / AttributeAccessExpr (keep AST node).
-        """
         self.eat("DOT")
         attr = self.eat("IDENT").value
 
@@ -672,12 +614,7 @@ class Parser:
                 args.append(self.bool_expr())
         return args
 
-    # ------------------------------------------------------------------ #
-    # F-string parser
-    # ------------------------------------------------------------------ #
-
     def _parse_fstring(self, raw_content):
-        """Parse raw f-string content into a FStringExpr node."""
         from compiler.lexer import tokenize as _lex
 
         def _unescape_segment(s):
@@ -732,11 +669,9 @@ class Parser:
                     current_literal += '{'
                     i += 2
                     continue
-                # start of expression
                 if current_literal:
                     parts.append(String(_unescape_segment(current_literal)))
                     current_literal = ""
-                # find matching closing brace
                 depth = 1
                 j = i + 1
                 while j < len(raw_content) and depth > 0:
@@ -746,7 +681,6 @@ class Parser:
                         depth -= 1
                     j += 1
                 expr_content = raw_content[i + 1: j - 1]
-                # split on first ':' to separate expression from format spec
                 fmt_spec = None
                 colon_idx = expr_content.find(':')
                 if colon_idx != -1:
@@ -754,7 +688,6 @@ class Parser:
                     expr_str = expr_content[:colon_idx].strip()
                 else:
                     expr_str = expr_content.strip()
-                # parse the expression with a fresh tokenizer + parser
                 expr_tokens = _lex(expr_str)
                 sub_parser = Parser(expr_tokens)
                 expr_node = sub_parser.bool_expr()
