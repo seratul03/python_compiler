@@ -277,3 +277,10 @@ class ChainedIndexAssignment(ASTNode):
         self.name = name        # str
         self.indices = indices  # list of ASTNode
         self.value = value
+
+
+class FStringExpr(ASTNode):
+    """f"..." — parts is a list of String nodes (literal text) or
+    (expr_node, format_spec_str_or_None) tuples (interpolated expressions)."""
+    def __init__(self, parts):
+        self.parts = parts

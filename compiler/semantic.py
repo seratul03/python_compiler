@@ -7,9 +7,9 @@ BUILTIN_NAMES = {
     "len", "input", "int", "float", "str", "bool", "abs", "round",
     "range", "list", "tuple", "set", "dict", "map", "enumerate",
     "zip", "sum", "min", "max", "sorted", "reversed", "print",
-    "isinstance", "hasattr", "getattr", "setattr", "type",
+    "isinstance", "hasattr", "getattr", "setattr", "type", "format",
     "True", "False", "None", "self", "super",
-    "NotImplemented", "Ellipsis",
+    "NotImplemented", "Ellipsis", "__name__",
 }
 
 

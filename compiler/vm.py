@@ -11,10 +11,6 @@ class ContinueSignal(Exception):
     pass
 
 
-# ---------------------------------------------------------------------------
-# Built-in functions available inside the VM
-# ---------------------------------------------------------------------------
-
 _BUILTIN_CALLABLES = {
     "int":   int,
     "float": float,
@@ -31,15 +27,36 @@ class VirtualMachine:
         self.instructions = instructions
         self.stack = []
         self.frames = [Frame()]
-        self.functions = {}       # name → {"params": [...], "instructions": [...]}
-        self.classes   = {}       # name → ClassDef node
+        self.functions = {}       
+        self.classes   = {}       
         self.output    = []
-        self.call_stack = []      # [(saved_instructions, return_ip), ...]
-        self._input_provider = input  # can be overridden for testing
+        self.call_stack = []    
+        self._input_provider = input  
 
-    # ------------------------------------------------------------------ #
-    # Helpers
-    # ------------------------------------------------------------------ #
+        from compiler.jit import JITCompiler
+        self.jit = JITCompiler(threshold=10)
+        self._jit_builtins = {
+            "range":    lambda *a: list(range(*[int(x) for x in a])),
+            "len":      len,
+            "str":      str,
+            "int":      int,
+            "float":    float,
+            "bool":     bool,
+            "abs":      abs,
+            "round":    round,
+            "sorted":   sorted,
+            "reversed": lambda x: list(reversed(x)),
+            "sum":      sum,
+            "min":      min,
+            "max":      max,
+            "zip":      lambda *a: [list(r) for r in zip(*a)],
+            "enumerate": enumerate,
+            "list":     list,
+            "tuple":    tuple,
+            "type":     lambda x: type(x).__name__,
+            "__jit_print__": self._jit_print,
+        }
+
 
     def current_frame(self):
         return self.frames[-1]
@@ -49,7 +66,6 @@ class VirtualMachine:
         for frame in reversed(self.frames):
             if name in frame.variables:
                 return frame.variables[name]
-        # built-in callables / constants
         if name in _BUILTIN_CALLABLES:
             return _BUILTIN_CALLABLES[name]
         if name == "True":
@@ -58,6 +74,8 @@ class VirtualMachine:
             return False
         if name == "None":
             return None
+        if name == "__name__":
+            return "__main__"
         if name in self.functions:
             return name 
         if name in self.classes:
@@ -65,7 +83,6 @@ class VirtualMachine:
         return 0  
 
     def _compile_body(self, stmts):
-        """Compile a list of AST statements to instructions."""
         from compiler.bytecode import BytecodeGenerator
         from compiler.ast_nodes import Program
         gen = BytecodeGenerator()
@@ -77,7 +94,6 @@ class VirtualMachine:
         return instrs
 
     def _find_method(self, class_name, method_name):
-        """Walk the inheritance chain to find a method definition."""
         visited = set()
         while class_name and class_name not in visited:
             visited.add(class_name)
@@ -91,7 +107,6 @@ class VirtualMachine:
         return None, None
 
     def _fmt(self, v):
-        """Format a value for output, honouring __str__ on class instances."""
         if isinstance(v, bool):
             return "True" if v else "False"
         if v is None:
@@ -104,10 +119,6 @@ class VirtualMachine:
         return str(v)
 
     def _instance_str(self, obj):
-        """
-        Call __str__ on a class instance if the method is defined.
-        Returns the string result, or a default '<ClassName object>' if not defined.
-        """
         if not (isinstance(obj, dict) and "__class__" in obj):
             return None
         method_node, _ = self._find_method(obj["__class__"], "__str__")
@@ -128,7 +139,6 @@ class VirtualMachine:
         return str(result)
 
     def _call_method_node(self, method_node, obj, args, ip):
-        """Switch instruction stream to execute a class method."""
         method_instructions = self._compile_body(method_node.body)
         new_frame = Frame()
         new_frame.variables["self"] = obj
@@ -140,7 +150,29 @@ class VirtualMachine:
         self.instructions = method_instructions
         return -1 
 
+    def _jit_print(self, *args):
+        self.output.append(" ".join(self._fmt(v) for v in args))
+
     def _call_function(self, func_name, args, ip):
+        self.jit.record_call(func_name)
+        cached_fn = self.jit.try_get_compiled(func_name)
+        if cached_fn is None and self.jit.should_compile(func_name):
+            func_entry   = self.functions.get(func_name, {})
+            func_def_node = func_entry.get("node")
+            if func_def_node:
+                ns = dict(self._jit_builtins)
+                for fname, fn in self.jit._cache.items():
+                    if callable(fn):
+                        ns[fname] = fn
+                cached_fn = self.jit.try_compile(func_name, func_def_node, ns)
+        if cached_fn is not None:
+            try:
+                result = cached_fn(*args)
+                self.stack.append(result)
+                return ip
+            except Exception:
+                pass
+
         func = self.functions[func_name]
         new_frame = Frame()
         for param, val in zip(func["params"], args):
@@ -148,7 +180,7 @@ class VirtualMachine:
         self.frames.append(new_frame)
         self.call_stack.append((self.instructions, ip + 1))
         self.instructions = func["instructions"]
-        return -1 
+        return -1
 
     def run(self):
         ip = 0
@@ -289,6 +321,7 @@ class VirtualMachine:
                 self.functions[func_node.name] = {
                     "params":       func_node.params,
                     "instructions": self._compile_body(func_node.body),
+                    "node":         func_node,  
                 }
             elif op == "CALL_FUNCTION":
                 name, arg_count = instr.argument
@@ -391,20 +424,18 @@ class VirtualMachine:
         return "\n".join(str(x) for x in self.output)
 
     def _dispatch_call(self, name, args, ip):
-        """
-        Handle all built-in functions.
-        Returns ip=-1 if control was handed to user-defined code (the caller
-        must then start the new instruction stream at ip=0).
-        Otherwise returns the next ip to continue at (caller should ip+=1 skip).
-        This method pushes a result onto self.stack in the built-in case.
-        """
-
         if name == "str":
             obj = args[0] if args else ""
             if isinstance(obj, dict) and "__class__" in obj:
                 self.stack.append(self._instance_str(obj) or str(obj))
             else:
                 self.stack.append(str(obj))
+            return ip
+
+        if name == "format":
+            value = args[0]
+            spec = args[1] if len(args) > 1 else ""
+            self.stack.append(format(value, spec))
             return ip
 
         if name in ("int", "float", "bool", "abs", "round"):

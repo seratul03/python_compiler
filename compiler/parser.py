@@ -56,9 +56,13 @@ class Parser:
             self.eat("PASS")
             return Pass()
 
-        # bare string literal (docstring as no-op)
+        # bare string/fstring literal (docstring as no-op)
         if token.type == "STRING":
             self.eat("STRING")
+            return Pass()
+
+        if token.type == "FSTRING":
+            self.eat("FSTRING")
             return Pass()
 
         # break
@@ -102,9 +106,18 @@ class Parser:
             if self.current().type != "RPAREN":
                 param = self.eat("IDENT").value
                 params.append(param)
+                if self.current() and self.current().type == "ASSIGN":
+                    self.eat("ASSIGN")
+                    self.bool_expr()  # parse and discard default value
                 while self.current() and self.current().type == "COMMA":
                     self.eat("COMMA")
-                    params.append(self.eat("IDENT").value)
+                    if self.current() and self.current().type == "RPAREN":
+                        break
+                    param = self.eat("IDENT").value
+                    params.append(param)
+                    if self.current() and self.current().type == "ASSIGN":
+                        self.eat("ASSIGN")
+                        self.bool_expr()  # parse and discard default value
             self.eat("RPAREN")
             self.eat("COLON")
             body = self.block()
@@ -485,6 +498,10 @@ class Parser:
         if token.type == "FLOAT":
             return Float(self.eat("FLOAT").value)
 
+        if token.type == "FSTRING":
+            raw = self.eat("FSTRING").value
+            return self._parse_fstring(raw)
+
         if token.type == "STRING":
             return String(self.eat("STRING").value)
 
@@ -654,3 +671,103 @@ class Parser:
                     break
                 args.append(self.bool_expr())
         return args
+
+    # ------------------------------------------------------------------ #
+    # F-string parser
+    # ------------------------------------------------------------------ #
+
+    def _parse_fstring(self, raw_content):
+        """Parse raw f-string content into a FStringExpr node."""
+        from compiler.lexer import tokenize as _lex
+
+        def _unescape_segment(s):
+            from compiler.lexer import _is_hex
+            import unicodedata
+            result = []
+            j = 0
+            while j < len(s):
+                if s[j] == '\\' and j + 1 < len(s):
+                    c = s[j + 1]
+                    if   c == 'n':  result.append('\n'); j += 2
+                    elif c == 't':  result.append('\t'); j += 2
+                    elif c == 'r':  result.append('\r'); j += 2
+                    elif c == '\\': result.append('\\'); j += 2
+                    elif c == '"':  result.append('"');  j += 2
+                    elif c == "'":  result.append("'");  j += 2
+                    elif c == 'a':  result.append('\a'); j += 2
+                    elif c == 'b':  result.append('\b'); j += 2
+                    elif c == 'f':  result.append('\f'); j += 2
+                    elif c == 'v':  result.append('\v'); j += 2
+                    elif c == '0':  result.append('\0'); j += 2
+                    elif c == 'x' and j + 3 < len(s) and _is_hex(s[j+2:j+4]):
+                        result.append(chr(int(s[j+2:j+4], 16))); j += 4
+                    elif c == 'u' and j + 5 < len(s) and _is_hex(s[j+2:j+6]):
+                        result.append(chr(int(s[j+2:j+6], 16))); j += 6
+                    elif c == 'U' and j + 9 < len(s) and _is_hex(s[j+2:j+10]):
+                        result.append(chr(int(s[j+2:j+10], 16))); j += 10
+                    elif c == 'N' and j + 2 < len(s) and s[j+2] == '{':
+                        end = s.find('}', j + 3)
+                        if end != -1:
+                            try:
+                                result.append(unicodedata.lookup(s[j+3:end]))
+                                j = end + 1
+                                continue
+                            except KeyError:
+                                pass
+                        result.append(s[j]); j += 1
+                    else:           result.append(s[j]); j += 1
+                else:
+                    result.append(s[j])
+                    j += 1
+            return ''.join(result)
+
+        parts = []
+        i = 0
+        current_literal = ""
+
+        while i < len(raw_content):
+            ch = raw_content[i]
+            if ch == '{':
+                if i + 1 < len(raw_content) and raw_content[i + 1] == '{':
+                    current_literal += '{'
+                    i += 2
+                    continue
+                # start of expression
+                if current_literal:
+                    parts.append(String(_unescape_segment(current_literal)))
+                    current_literal = ""
+                # find matching closing brace
+                depth = 1
+                j = i + 1
+                while j < len(raw_content) and depth > 0:
+                    if raw_content[j] == '{':
+                        depth += 1
+                    elif raw_content[j] == '}':
+                        depth -= 1
+                    j += 1
+                expr_content = raw_content[i + 1: j - 1]
+                # split on first ':' to separate expression from format spec
+                fmt_spec = None
+                colon_idx = expr_content.find(':')
+                if colon_idx != -1:
+                    fmt_spec = expr_content[colon_idx + 1:]
+                    expr_str = expr_content[:colon_idx].strip()
+                else:
+                    expr_str = expr_content.strip()
+                # parse the expression with a fresh tokenizer + parser
+                expr_tokens = _lex(expr_str)
+                sub_parser = Parser(expr_tokens)
+                expr_node = sub_parser.bool_expr()
+                parts.append((expr_node, fmt_spec))
+                i = j
+            elif ch == '}' and i + 1 < len(raw_content) and raw_content[i + 1] == '}':
+                current_literal += '}'
+                i += 2
+            else:
+                current_literal += ch
+                i += 1
+
+        if current_literal:
+            parts.append(String(_unescape_segment(current_literal)))
+
+        return FStringExpr(parts)

@@ -1,9 +1,58 @@
 import re
 
+
+def _is_hex(s):
+    """Return True if s is a non-empty string of hexadecimal digits."""
+    return len(s) > 0 and all(c in '0123456789abcdefABCDEF' for c in s)
+
+
+def _unescape_string(s):
+    """Process escape sequences in a string literal, including Unicode escapes."""
+    import unicodedata
+    result = []
+    i = 0
+    while i < len(s):
+        if s[i] == '\\' and i + 1 < len(s):
+            c = s[i + 1]
+            if   c == 'n':  result.append('\n'); i += 2
+            elif c == 't':  result.append('\t'); i += 2
+            elif c == 'r':  result.append('\r'); i += 2
+            elif c == '\\': result.append('\\'); i += 2
+            elif c == '"':  result.append('"');  i += 2
+            elif c == "'":  result.append("'");  i += 2
+            elif c == 'a':  result.append('\a'); i += 2
+            elif c == 'b':  result.append('\b'); i += 2
+            elif c == 'f':  result.append('\f'); i += 2
+            elif c == 'v':  result.append('\v'); i += 2
+            elif c == '0':  result.append('\0'); i += 2
+            elif c == 'x' and i + 3 < len(s) and _is_hex(s[i+2:i+4]):
+                result.append(chr(int(s[i+2:i+4], 16))); i += 4
+            elif c == 'u' and i + 5 < len(s) and _is_hex(s[i+2:i+6]):
+                result.append(chr(int(s[i+2:i+6], 16))); i += 6
+            elif c == 'U' and i + 9 < len(s) and _is_hex(s[i+2:i+10]):
+                result.append(chr(int(s[i+2:i+10], 16))); i += 10
+            elif c == 'N' and i + 2 < len(s) and s[i+2] == '{':
+                end = s.find('}', i + 3)
+                if end != -1:
+                    try:
+                        result.append(unicodedata.lookup(s[i+3:end]))
+                        i = end + 1
+                        continue
+                    except KeyError:
+                        pass
+                result.append(s[i]); i += 1
+            else:           result.append(s[i]); i += 1
+        else:
+            result.append(s[i])
+            i += 1
+    return ''.join(result)
+
+
 TOKEN_SPEC = [
     ("SKIP",         r"[ \t]+"),
     ("FLOAT",        r"\d+\.\d+"),         
     ("NUMBER",       r"\d+"),
+    ("FSTRING",      r'f"[^"]*"|f\'[^\']*\''),
     ("STRING",       r'"[^"]*"|\'[^\']*\''), 
     ("EQ",           r"=="),
     ("NEQ",          r"!="),
@@ -14,7 +63,7 @@ TOKEN_SPEC = [
     ("MULT_ASSIGN",  r"\*="),            
     ("LT",           r"<"),
     ("GT",           r">"),
-    ("IDENT",        r"[a-zA-Z_][a-zA-Z0-9_]*"),
+    ("IDENT",        r"[^\W\d]\w*"),
     ("PLUS_ASSIGN",  r"\+="),
     ("PLUS",         r"\+"),
     ("MINUS_ASSIGN", r"-="),             
@@ -154,14 +203,23 @@ def tokenize(code):
             elif kind == "NUMBER":
                 tokens.append(Token("NUMBER", int(value), line_num, pos))
 
-            elif kind == "STRING":
-                tokens.append(Token("STRING", value[1:-1], line_num, pos))
+            elif kind == "FSTRING":
+                tokens.append(Token("FSTRING", value[2:-1], line_num, pos))
 
-            elif kind == "IDENT" and value in KEYWORDS:
-                tokens.append(Token(KEYWORDS[value], value, line_num, pos))
+            elif kind == "STRING":
+                tokens.append(Token("STRING", _unescape_string(value[1:-1]), line_num, pos))
 
             elif kind == "IDENT":
-                tokens.append(Token("IDENT", value, line_num, pos))
+                # Extend past Unicode combining/continuation chars (e.g. Devanagari
+                # vowel signs) that re's \w misses, using Python's own identifier rules.
+                end = pos + len(value)
+                while end < len(stripped) and (value + stripped[end]).isidentifier():
+                    value += stripped[end]
+                    end += 1
+                if value in KEYWORDS:
+                    tokens.append(Token(KEYWORDS[value], value, line_num, pos))
+                else:
+                    tokens.append(Token("IDENT", value, line_num, pos))
 
             else:
                 tokens.append(Token(kind, value, line_num, pos))

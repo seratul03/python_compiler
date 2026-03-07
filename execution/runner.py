@@ -85,8 +85,10 @@ def start_process(user_code):
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
+        encoding="utf-8",
         cwd=temp_dir,
-        bufsize=1
+        bufsize=1,
+        env={**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"},
     )
 
     pid = str(uuid.uuid4())
@@ -153,7 +155,7 @@ def safe_exec(code, input_data=""):
     sys.stdout = io.StringIO()
     sys.stdin = io.StringIO(input_data)
 
-    safe_globals = {"__builtins__": SAFE_BUILTINS}
+    safe_globals = {"__builtins__": SAFE_BUILTINS, "__name__": "__main__"}
 
     try:
         exec(code, safe_globals)

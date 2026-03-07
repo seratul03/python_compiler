@@ -402,6 +402,29 @@ class BytecodeGenerator:
             Instruction("CALL_FUNCTION", (node.name, len(node.args)))
         )
 
+    def visit_FStringExpr(self, node):
+        """Compile f-string: convert each part to a string, then concatenate all."""
+        if not node.parts:
+            self.instructions.append(Instruction("LOAD_CONST", ""))
+            return
+
+        def _emit_part(part):
+            if isinstance(part, String):
+                self.instructions.append(Instruction("LOAD_CONST", part.value))
+            else:
+                expr_node, fmt_spec = part
+                self.generate(expr_node)
+                if fmt_spec:
+                    self.instructions.append(Instruction("LOAD_CONST", fmt_spec))
+                    self.instructions.append(Instruction("CALL_FUNCTION", ("format", 2)))
+                else:
+                    self.instructions.append(Instruction("CALL_FUNCTION", ("str", 1)))
+
+        _emit_part(node.parts[0])
+        for part in node.parts[1:]:
+            _emit_part(part)
+            self.instructions.append(Instruction("ADD"))
+
     def visit_Return(self, node):
         self.generate(node.value)
         self.instructions.append(Instruction("RETURN_VALUE"))
