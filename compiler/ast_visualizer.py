@@ -4,12 +4,7 @@ class ASTVisualizer:
 
     def visualize(self, node, indent=0):
         prefix = "  " * indent
-        label = node.__class__.__name__
-
-        if hasattr(node, "value") and not hasattr(node.value, "__dict__"):
-            label += f"({node.value})"
-        elif hasattr(node, "name"):
-            label += f"({node.name})"
+        label = self._node_label(node)
 
         self.lines.append(prefix + label)
 
