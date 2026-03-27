@@ -174,7 +174,7 @@ def format_error(e):
         "formatted": f"{name}: {message}"
     }
 
-def start_process(user_code):
+def start_process(user_code, ai_mode=False):
 
     security_check(user_code)
 
@@ -201,7 +201,11 @@ def start_process(user_code):
     active_processes[pid] = {
         "process": process,
         "temp_dir": temp_dir,
-        "buffer": ""
+        "buffer": "",
+        "full_output": "",
+        "ai_mode": ai_mode,
+        "code": user_code,
+        "ai_post_result": None,
     }
 
     def reader():
@@ -307,10 +311,31 @@ def read_output(pid):
 
     output = process_data["buffer"]
     process_data["buffer"] = ""
+    if output:
+        process_data["full_output"] += output
 
     if process.poll() is not None:
+        response = {"output": output, "finished": True}
+
+        runtime_error = ""
+        if process.returncode not in (0, None):
+            runtime_error = process_data.get("full_output", "")
+            response["runtime_error"] = runtime_error
+
+        if process_data.get("ai_mode") and runtime_error:
+            if process_data.get("ai_post_result") is None:
+                from ai.ai_checker import analyze_output
+                response_ai = analyze_output(
+                    process_data.get("code", ""),
+                    process_data.get("full_output", ""),
+                    runtime_error,
+                )
+                process_data["ai_post_result"] = response_ai
+
+            response["ai_postcheck"] = process_data.get("ai_post_result")
+
         cleanup(pid)
-        return {"output": output, "finished": True}
+        return response
 
     return {"output": output}
 

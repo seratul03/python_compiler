@@ -1,23 +1,126 @@
 const outputBoxEl = document.getElementById("output");
 outputBoxEl.contentEditable = "false";
 
+const aiToggleEl = document.getElementById("ai-toggle");
+const aiModalEl = document.getElementById("ai-modal");
+const aiStatusEl = document.getElementById("ai-status");
+const aiMessageEl = document.getElementById("ai-message");
+const aiFixedCodeEl = document.getElementById("ai-fixed-code");
+const aiApplyFixBtn = document.getElementById("apply-fix-btn");
+const aiOkBtn = document.getElementById("ai-ok-btn");
+
+let aiFixedCode = "";
+let aiPrecheckShown = false;
+let aiPostcheckShown = false;
+let aiHasError = false;
 
 function toggleTheme() {
-    const isDark = document.body.getAttribute('data-theme') === 'dark';
-    if (isDark) {
-        document.body.removeAttribute('data-theme');
-        if (window.monaco) monaco.editor.setTheme('formal-light');
-        localStorage.setItem('pyflux-theme', 'light');
-    } else {
-        document.body.setAttribute('data-theme', 'dark');
-        if (window.monaco) monaco.editor.setTheme('formal-dark');
-        localStorage.setItem('pyflux-theme', 'dark');
-    }
+  const isDark = document.body.getAttribute("data-theme") === "dark";
+  if (isDark) {
+    document.body.removeAttribute("data-theme");
+    if (window.monaco) monaco.editor.setTheme("formal-light");
+    localStorage.setItem("pyflux-theme", "light");
+  } else {
+    document.body.setAttribute("data-theme", "dark");
+    if (window.monaco) monaco.editor.setTheme("formal-dark");
+    localStorage.setItem("pyflux-theme", "dark");
+  }
+  refreshOutputColor();
 }
 
 function getTextColor() {
-    return document.body.getAttribute('data-theme') === 'dark' ? '#C2D8F0' : '#111827';
+  return document.body.getAttribute("data-theme") === "dark"
+    ? "#C2D8F0"
+    : "#111827";
 }
+
+function setOutputStatus(status) {
+  if (!outputBoxEl) return;
+  outputBoxEl.dataset.status = status;
+  if (status === "error") {
+    outputBoxEl.style.color = "red";
+  } else {
+    outputBoxEl.style.color = getTextColor();
+  }
+}
+
+function refreshOutputColor() {
+  if (!outputBoxEl) return;
+  if (outputBoxEl.dataset.status !== "error") {
+    outputBoxEl.style.color = getTextColor();
+  }
+}
+
+function isAiModeEnabled() {
+  return Boolean(aiToggleEl && aiToggleEl.checked);
+}
+
+function setAiModalOpen(isOpen) {
+  if (!aiModalEl) return;
+  if (isOpen) {
+    aiModalEl.classList.add("active");
+    aiModalEl.setAttribute("aria-hidden", "false");
+  } else {
+    aiModalEl.classList.remove("active");
+    aiModalEl.setAttribute("aria-hidden", "true");
+  }
+}
+
+function showAiModal(result) {
+  if (!aiModalEl || !result) return;
+
+  const status = String(result.status || "ERROR").toUpperCase();
+  const isOk = status === "OK";
+  if (isOk && aiHasError) {
+    return;
+  }
+  const message = isOk
+    ? "Your code is good to run"
+    : result.message || "AI detected an issue.";
+
+  if (aiStatusEl) aiStatusEl.textContent = "Status: " + (isOk ? "OK" : "ERROR");
+  if (aiMessageEl) aiMessageEl.textContent = message;
+
+  aiFixedCode = result.fixed_code || "";
+  const showFix = !isOk && aiFixedCode;
+  if (aiFixedCodeEl) {
+    aiFixedCodeEl.textContent = showFix ? aiFixedCode : "";
+    aiFixedCodeEl.style.display = showFix ? "block" : "none";
+  }
+  if (aiApplyFixBtn) aiApplyFixBtn.disabled = !showFix;
+  if (aiOkBtn) {
+    const showOk = isOk || !showFix;
+    aiOkBtn.style.display = showOk ? "inline-flex" : "none";
+  }
+
+  aiHasError = !isOk;
+
+  setAiModalOpen(true);
+}
+
+function closeAiModal() {
+  setAiModalOpen(false);
+}
+
+function applyAiFix() {
+  if (!aiFixedCode || !window.editor) return;
+  editor.setValue(aiFixedCode);
+  closeAiModal();
+}
+
+if (aiModalEl) {
+  aiModalEl.addEventListener("click", function (e) {
+    if (e.target === aiModalEl) {
+      closeAiModal();
+    }
+  });
+}
+
+document.addEventListener("keydown", function (e) {
+  if (e.key === "Escape") {
+    closeAiModal();
+  }
+});
 
 let currentPid = null;
 let pollTimer = null;
@@ -28,317 +131,362 @@ let sessionOutput = "";
 const _buildingTimers = {};
 
 function showBuildingAnimation(sectionId, label) {
-    stopBuildingAnimation(sectionId);
-    const el = document.getElementById(sectionId);
-    el.innerHTML = '';
+  stopBuildingAnimation(sectionId);
+  const el = document.getElementById(sectionId);
+  el.innerHTML = "";
 
-    const wrapper = document.createElement('div');
-    wrapper.className = 'building-anim';
+  const wrapper = document.createElement("div");
+  wrapper.className = "building-anim";
 
-    const text = document.createElement('span');
-    text.textContent = 'Building ' + label;
+  const text = document.createElement("span");
+  text.textContent = "Building " + label;
 
-    const dots = document.createElement('span');
-    dots.className = 'building-dots';
-    dots.textContent = '';
+  const dots = document.createElement("span");
+  dots.className = "building-dots";
+  dots.textContent = "";
 
-    wrapper.appendChild(text);
-    wrapper.appendChild(dots);
-    el.appendChild(wrapper);
+  wrapper.appendChild(text);
+  wrapper.appendChild(dots);
+  el.appendChild(wrapper);
 
-    let count = 0;
-    _buildingTimers[sectionId] = setInterval(() => {
-        count = (count % 3) + 1;
-        dots.textContent = '.'.repeat(count);
-    }, 380);
+  let count = 0;
+  _buildingTimers[sectionId] = setInterval(() => {
+    count = (count % 3) + 1;
+    dots.textContent = ".".repeat(count);
+  }, 380);
 }
 
 function stopBuildingAnimation(sectionId) {
-    if (_buildingTimers[sectionId]) {
-        clearInterval(_buildingTimers[sectionId]);
-        delete _buildingTimers[sectionId];
-    }
+  if (_buildingTimers[sectionId]) {
+    clearInterval(_buildingTimers[sectionId]);
+    delete _buildingTimers[sectionId];
+  }
 }
 
 function stopAllBuildingAnimations() {
-    stopBuildingAnimation('ast');
-    stopBuildingAnimation('cfg');
-    stopBuildingAnimation('bytecode');
+  stopBuildingAnimation("ast");
+  stopBuildingAnimation("cfg");
+  stopBuildingAnimation("bytecode");
 }
 
 function switchTab(tab) {
+  document.querySelectorAll(".tab-content").forEach((el) => {
+    el.classList.remove("active");
+  });
 
-    document.querySelectorAll(".tab-content").forEach(el => {
-        el.classList.remove("active")
-    })
+  document.querySelectorAll(".tab-btn").forEach((el) => {
+    el.classList.remove("active");
+  });
 
-    document.querySelectorAll(".tab-btn").forEach(el => {
-        el.classList.remove("active")
-    })
+  document.getElementById(tab).classList.add("active");
 
-    document.getElementById(tab).classList.add("active")
-
-    document.querySelectorAll(".tab-btn").forEach(btn => {
-        if (btn.innerText.toLowerCase() === tab) {
-            btn.classList.add("active")
-        }
-    })
+  document.querySelectorAll(".tab-btn").forEach((btn) => {
+    if (btn.innerText.toLowerCase() === tab) {
+      btn.classList.add("active");
+    }
+  });
 }
 
 function runCode() {
-    const code = editor.getValue();
-    const outputBox = outputBoxEl;
+  const code = editor.getValue();
+  const outputBox = outputBoxEl;
 
-    stopSession();
+  stopSession();
+  closeAiModal();
+  aiFixedCode = "";
+  aiPrecheckShown = false;
+  aiPostcheckShown = false;
+  aiHasError = false;
 
-    outputBox.innerText = "Running...";
-    outputBox.style.color = getTextColor();
-    sessionOutput = "";
+  outputBox.innerText = "Running...";
+  setOutputStatus("normal");
+  sessionOutput = "";
 
-    showBuildingAnimation('ast', 'AST');
-    showBuildingAnimation('cfg', 'CFG');
-    showBuildingAnimation('bytecode', 'Bytecode');
+  showBuildingAnimation("ast", "AST");
+  showBuildingAnimation("cfg", "CFG");
+  showBuildingAnimation("bytecode", "Bytecode");
 
-    fetch("/start", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: code })
+  fetch("/start", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code: code, ai_mode: isAiModeEnabled() }),
+  })
+    .then((res) => res.json())
+    .then((data) => {
+      if (data.error) {
+        stopAllBuildingAnimations();
+        outputBox.innerText =
+          typeof data.error === "object"
+            ? data.error.type + ":\n" + data.error.message
+            : data.error;
+        setOutputStatus("error");
+        return;
+      }
+
+      currentPid = data.pid;
+      emptyPollCount = 0;
+      isWaitingForInput = false;
+      sessionOutput = "";
+      outputBox.innerText = "";
+
+      stopAllBuildingAnimations();
+      renderASTTree(data.ast_json || null);
+      document.getElementById("cfg").innerText = data.cfg || "";
+      document.getElementById("bytecode").innerText = data.bytecode || "";
+
+      if (data.ai_precheck && !aiPrecheckShown) {
+        showAiModal(data.ai_precheck);
+        aiPrecheckShown = true;
+      }
+
+      pollTimer = setInterval(pollOutput, 150);
     })
-        .then(res => res.json())
-        .then(data => {
-            if (data.error) {
-                stopAllBuildingAnimations();
-                outputBox.innerText = typeof data.error === "object"
-                    ? data.error.type + ":\n" + data.error.message
-                    : data.error;
-                outputBox.style.color = "red";
-                return;
-            }
-
-            currentPid = data.pid;
-            emptyPollCount = 0;
-            isWaitingForInput = false;
-            sessionOutput = "";
-            outputBox.innerText = "";
-
-            stopAllBuildingAnimations();
-            renderASTTree(data.ast_json || null);
-            document.getElementById('cfg').innerText = data.cfg || "";
-            document.getElementById('bytecode').innerText = data.bytecode || "";
-
-            pollTimer = setInterval(pollOutput, 150);
-        })
-        .catch(() => {
-            stopAllBuildingAnimations();
-            outputBox.innerText = "Error communicating with server.";
-            outputBox.style.color = "red";
-        });
+    .catch(() => {
+      stopAllBuildingAnimations();
+      outputBox.innerText = "Error communicating with server.";
+      setOutputStatus("error");
+    });
 }
 
 function pollOutput() {
-    if (!currentPid) return;
+  if (!currentPid) return;
 
-    const pid = currentPid;
+  const pid = currentPid;
 
-    fetch(`/output/${pid}`)
-        .then(res => res.json())
-        .then(data => {
-            if (!currentPid) return;
+  fetch(`/output/${pid}`)
+    .then((res) => res.json())
+    .then((data) => {
+      if (!currentPid) return;
 
-            const outputBox = outputBoxEl;
+      const outputBox = outputBoxEl;
 
-            if (data.error) {
-                stopSession();
-                outputBox.innerText = sessionOutput + "\n" + data.error;
-                outputBox.style.color = "red";
-                return;
-            }
+      if (data.error) {
+        stopSession();
+        outputBox.innerText = sessionOutput + "\n" + data.error;
+        setOutputStatus("error");
+        return;
+      }
 
-            if (data.output) {
-                sessionOutput += data.output;
-                outputBox.innerText = sessionOutput;
-                outputBox.scrollTop = outputBox.scrollHeight;
-                emptyPollCount = 0;
-                if (isWaitingForInput) {
-                    hideInputRow();
-                    isWaitingForInput = false;
-                }
-            } else if (!data.finished) {
-                emptyPollCount++;
-                if (emptyPollCount >= 5 && !isWaitingForInput) {
-                    showInputRow();
-                }
-            }
+      if (data.output) {
+        sessionOutput += data.output;
+        outputBox.innerText = sessionOutput;
+        outputBox.scrollTop = outputBox.scrollHeight;
+        emptyPollCount = 0;
+        if (isWaitingForInput) {
+          hideInputRow();
+          isWaitingForInput = false;
+        }
+      } else if (!data.finished) {
+        emptyPollCount++;
+        if (emptyPollCount >= 5 && !isWaitingForInput) {
+          showInputRow();
+        }
+      }
 
-            if (data.finished) {
-                stopSession();
-                outputBox.style.color = getTextColor();
-                if (!sessionOutput) {
-                    outputBox.innerText = "(no output)";
-                }
-            }
-        })
-        .catch(() => stopSession());
+      if (data.ai_postcheck && !aiPostcheckShown) {
+        showAiModal(data.ai_postcheck);
+        aiPostcheckShown = true;
+      }
+
+      if (data.finished) {
+        stopSession();
+        setOutputStatus("normal");
+        if (!sessionOutput) {
+          outputBox.innerText = "(no output)";
+        }
+      }
+    })
+    .catch(() => stopSession());
 }
 
 function showInputRow() {
-    isWaitingForInput = true;
-    const row = document.getElementById('input-row');
-    row.style.display = 'flex';
-    document.getElementById('user-input-field').focus();
+  isWaitingForInput = true;
+  const row = document.getElementById("input-row");
+  row.style.display = "flex";
+  document.getElementById("user-input-field").focus();
 }
 
 function hideInputRow() {
-    const row = document.getElementById('input-row');
-    row.style.display = 'none';
-    document.getElementById('user-input-field').value = '';
+  const row = document.getElementById("input-row");
+  row.style.display = "none";
+  document.getElementById("user-input-field").value = "";
 }
 
 function submitInput() {
-    if (!currentPid || !isWaitingForInput) return;
+  if (!currentPid || !isWaitingForInput) return;
 
-    const inputField = document.getElementById('user-input-field');
-    const value = inputField.value;
+  const inputField = document.getElementById("user-input-field");
+  const value = inputField.value;
 
-    sessionOutput += value + "\n";
-    outputBoxEl.innerText = sessionOutput;
+  sessionOutput += value + "\n";
+  outputBoxEl.innerText = sessionOutput;
 
-    hideInputRow();
-    emptyPollCount = 0;
-    isWaitingForInput = false;
+  hideInputRow();
+  emptyPollCount = 0;
+  isWaitingForInput = false;
 
-    fetch(`/input/${currentPid}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ input: value })
-    }).catch(() => {});
+  fetch(`/input/${currentPid}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ input: value }),
+  }).catch(() => {});
 }
 
 function stopSession() {
-    if (pollTimer) {
-        clearInterval(pollTimer);
-        pollTimer = null;
-    }
-    if (currentPid) {
-        const pid = currentPid;
-        currentPid = null;
-        fetch(`/stop/${pid}`, { method: "POST" }).catch(() => {});
-    }
-    hideInputRow();
-    isWaitingForInput = false;
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+  if (currentPid) {
+    const pid = currentPid;
+    currentPid = null;
+    fetch(`/stop/${pid}`, { method: "POST" }).catch(() => {});
+  }
+  hideInputRow();
+  isWaitingForInput = false;
 }
 
 function resetCompiler() {
-    stopSession();
-    sessionOutput = "";
+  stopSession();
+  sessionOutput = "";
+  closeAiModal();
+  aiFixedCode = "";
+  aiPrecheckShown = false;
+  aiPostcheckShown = false;
+  aiHasError = false;
 
-    const outputBox = outputBoxEl;
-    outputBox.innerText = "";
-    outputBox.style.color = getTextColor();
-    outputBox.contentEditable = "false";
+  const outputBox = outputBoxEl;
+  outputBox.innerText = "";
+  setOutputStatus("normal");
+  outputBox.contentEditable = "false";
 
-    document.getElementById('ast').innerHTML = "";
-    document.getElementById('cfg').innerText = "";
-    document.getElementById('bytecode').innerText = "";
+  document.getElementById("ast").innerHTML = "";
+  document.getElementById("cfg").innerText = "";
+  document.getElementById("bytecode").innerText = "";
 
-    stopAllBuildingAnimations();
+  stopAllBuildingAnimations();
 
-    editor.setValue("");
+  editor.setValue("");
 }
 
-
 function getASTNodeClass(label) {
-    const type = label.split('(')[0];
-    const LITERALS = new Set(['Number','Float','String','BoolLiteral','NoneLiteral']);
-    const OPS      = new Set(['BinaryOp','UnaryOp','Compare','BoolOp']);
-    const CONTROLS = new Set(['IfStatement','WhileLoop','ForLoop','ForInLoop',
-                               'Return','Break','Continue','Pass']);
-    const FUNCS    = new Set(['FunctionDef','FunctionCall','ClassDef',
-                               'ClassInstantiation','MethodCall','MethodCallExpr',
-                               'SuperMethodCall']);
-    const VARS     = new Set(['Variable','Assignment','AttributeAssignment',
-                               'AugmentedAssignment','AttributeAugAssignment',
-                               'AttributeAccess','AttributeAccessExpr',
-                               'IndexAssignment','ListAccess','ExprSubscript']);
-    if (type === 'Program')   return 'ast-root';
-    if (LITERALS.has(type))   return 'ast-literal';
-    if (OPS.has(type))        return 'ast-op';
-    if (CONTROLS.has(type))   return 'ast-control';
-    if (FUNCS.has(type))      return 'ast-func';
-    if (VARS.has(type))       return 'ast-var';
-    return 'ast-other';
+  const type = label.split("(")[0];
+  const LITERALS = new Set([
+    "Number",
+    "Float",
+    "String",
+    "BoolLiteral",
+    "NoneLiteral",
+  ]);
+  const OPS = new Set(["BinaryOp", "UnaryOp", "Compare", "BoolOp"]);
+  const CONTROLS = new Set([
+    "IfStatement",
+    "WhileLoop",
+    "ForLoop",
+    "ForInLoop",
+    "Return",
+    "Break",
+    "Continue",
+    "Pass",
+  ]);
+  const FUNCS = new Set([
+    "FunctionDef",
+    "FunctionCall",
+    "ClassDef",
+    "ClassInstantiation",
+    "MethodCall",
+    "MethodCallExpr",
+    "SuperMethodCall",
+  ]);
+  const VARS = new Set([
+    "Variable",
+    "Assignment",
+    "AttributeAssignment",
+    "AugmentedAssignment",
+    "AttributeAugAssignment",
+    "AttributeAccess",
+    "AttributeAccessExpr",
+    "IndexAssignment",
+    "ListAccess",
+    "ExprSubscript",
+  ]);
+  if (type === "Program") return "ast-root";
+  if (LITERALS.has(type)) return "ast-literal";
+  if (OPS.has(type)) return "ast-op";
+  if (CONTROLS.has(type)) return "ast-control";
+  if (FUNCS.has(type)) return "ast-func";
+  if (VARS.has(type)) return "ast-var";
+  return "ast-other";
 }
 
 function buildASTNode(data) {
-    const li = document.createElement('li');
-    const hasChildren = Array.isArray(data.children) && data.children.length > 0;
+  const li = document.createElement("li");
+  const hasChildren = Array.isArray(data.children) && data.children.length > 0;
 
-    const span = document.createElement('span');
-    span.className = `ast-node ${getASTNodeClass(data.label)}${hasChildren ? ' has-children' : ''}`;
-    span.appendChild(document.createTextNode(data.label));
+  const span = document.createElement("span");
+  span.className = `ast-node ${getASTNodeClass(data.label)}${hasChildren ? " has-children" : ""}`;
+  span.appendChild(document.createTextNode(data.label));
 
-    if (hasChildren) {
-        const toggle = document.createElement('span');
-        toggle.className = 'ast-toggle';
-        toggle.textContent = '\u25be';
-        span.appendChild(toggle);
-        span.addEventListener('click', function () {
-            const collapsed = li.classList.toggle('ast-collapsed');
-            toggle.textContent = collapsed ? '\u25b8' : '\u25be';
-        });
-    }
+  if (hasChildren) {
+    const toggle = document.createElement("span");
+    toggle.className = "ast-toggle";
+    toggle.textContent = "\u25be";
+    span.appendChild(toggle);
+    span.addEventListener("click", function () {
+      const collapsed = li.classList.toggle("ast-collapsed");
+      toggle.textContent = collapsed ? "\u25b8" : "\u25be";
+    });
+  }
 
-    li.appendChild(span);
+  li.appendChild(span);
 
-    if (hasChildren) {
-        const ul = document.createElement('ul');
-        data.children.forEach(child => ul.appendChild(buildASTNode(child)));
-        li.appendChild(ul);
-    }
+  if (hasChildren) {
+    const ul = document.createElement("ul");
+    data.children.forEach((child) => ul.appendChild(buildASTNode(child)));
+    li.appendChild(ul);
+  }
 
-    return li;
+  return li;
 }
 
 function renderASTTree(astData) {
-    const container = document.getElementById('ast');
-    container.innerHTML = '';
-    if (!astData) return;
+  const container = document.getElementById("ast");
+  container.innerHTML = "";
+  if (!astData) return;
 
-    const wrapper = document.createElement('div');
-    wrapper.className = 'ast-tree';
+  const wrapper = document.createElement("div");
+  wrapper.className = "ast-tree";
 
-    const rootUl = document.createElement('ul');
-    rootUl.appendChild(buildASTNode(astData));
-    wrapper.appendChild(rootUl);
+  const rootUl = document.createElement("ul");
+  rootUl.appendChild(buildASTNode(astData));
+  wrapper.appendChild(rootUl);
 
-    container.appendChild(wrapper);
+  container.appendChild(wrapper);
 }
 
 const menu = document.getElementById("editor-menu");
 const editorEl = document.getElementById("editor");
 
-editorEl.addEventListener("contextmenu", function(e){
+editorEl.addEventListener("contextmenu", function (e) {
+  e.preventDefault();
 
-    e.preventDefault();
-
-    menu.style.display = "block";
-    menu.style.left = e.pageX + "px";
-    menu.style.top = e.pageY + "px";
-
+  menu.style.display = "block";
+  menu.style.left = e.pageX + "px";
+  menu.style.top = e.pageY + "px";
 });
 
-document.addEventListener("click", function(){
-    menu.style.display = "none";
+document.addEventListener("click", function () {
+  menu.style.display = "none";
 });
 
-function menuCut(){
-    document.execCommand("cut");
+function menuCut() {
+  document.execCommand("cut");
 }
 
-function menuCopy(){
-    document.execCommand("copy");
+function menuCopy() {
+  document.execCommand("copy");
 }
 
-function menuPaste(){
-    document.execCommand("paste");
+function menuPaste() {
+  document.execCommand("paste");
 }

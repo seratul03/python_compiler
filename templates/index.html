@@ -1,231 +1,273 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
     <title>PyFlux</title>
 
-        <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,wght@6..144,1..1000&display=swap" rel="stylesheet">
+    <link
+      href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,wght@6..144,1..1000&display=swap"
+      rel="stylesheet"
+    />
 
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='style.css') }}"
+    />
 
-    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='Favicon.ico') }}">
+    <link
+      rel="icon"
+      type="image/x-icon"
+      href="{{ url_for('static', filename='Favicon.ico') }}"
+    />
+  </head>
 
-</head>
-
-<body>
-
+  <body>
     <div class="app-container">
+      <header class="app-header">
+        <h2>PyFlux</h2>
 
-        <header class="app-header">
+        <div style="display: flex; gap: 14px; align-items: center">
+          <label class="switch" title="Toggle dark / light theme">
+            <input
+              type="checkbox"
+              id="theme-checkbox"
+              checked
+              onchange="toggleTheme()"
+            />
+            <span class="slider"> </span>
+          </label>
 
-            <h2>PyFlux</h2>
+          <div class="ai-toggle" title="Toggle AI Mode">
+            <span>AI Mode</span>
+            <label class="switch">
+              <input type="checkbox" id="ai-toggle" />
+              <span class="slider"></span>
+            </label>
+          </div>
 
-            <div style="display:flex; gap:14px; align-items:center;">
+          <button type="button" class="run-btn" onclick="runCode()">
+            Run Code
+          </button>
 
-                <label class="switch" title="Toggle dark / light theme">
-                    <input type="checkbox" id="theme-checkbox" checked onchange="toggleTheme()" />
-                    <span class="slider">
-                    </span>
-                </label>
-
-                <button type="button" class="run-btn" onclick="runCode()">
-                    Run Code
-                </button>
-
-                <button type="button" class="run-btn" style="background:#64748B;" onclick="resetCompiler()">
-                    Reset
-                </button>
-
-            </div>
-
-        </header>
-
-        <div class="workspace">
-
-            <div class="editor-pane">
-                <div id="editor"></div>
-            </div>
-
-            <div class="output-pane">
-
-                <div class="tab-bar">
-
-                    <button class="tab-btn active" onclick="switchTab('output')">
-                        Output
-                    </button>
-
-                    <button class="tab-btn" onclick="switchTab('ast')">
-                        AST
-                    </button>
-
-                    <button class="tab-btn" onclick="switchTab('cfg')">
-                        CFG
-                    </button>
-
-                    <button class="tab-btn" onclick="switchTab('bytecode')">
-                        Bytecode
-                    </button>
-
-                </div>
-
-                <div id="output" class="tab-content active"></div>
-
-                <div id="ast" class="tab-content"></div>
-
-                <div id="cfg" class="tab-content"></div>
-
-                <div id="bytecode" class="tab-content"></div>
-
-                <div id="input-row">
-
-                    <input type="text" id="user-input-field" placeholder="Enter input..."
-                        onkeydown="if(event.key==='Enter') submitInput()" />
-
-                    <button onclick="submitInput()">
-                        Send
-                    </button>
-
-                </div>
-
-            </div>
+          <button
+            type="button"
+            class="run-btn"
+            style="background: #64748b"
+            onclick="resetCompiler()"
+          >
+            Reset
+          </button>
         </div>
+      </header>
+
+      <div class="workspace">
+        <div class="editor-pane">
+          <div id="editor"></div>
+        </div>
+
+        <div class="output-pane">
+          <div class="tab-bar">
+            <button class="tab-btn active" onclick="switchTab('output')">
+              Output
+            </button>
+
+            <button class="tab-btn" onclick="switchTab('ast')">AST</button>
+
+            <button class="tab-btn" onclick="switchTab('cfg')">CFG</button>
+
+            <button class="tab-btn" onclick="switchTab('bytecode')">
+              Bytecode
+            </button>
+          </div>
+
+          <div id="output" class="tab-content active"></div>
+
+          <div id="ast" class="tab-content"></div>
+
+          <div id="cfg" class="tab-content"></div>
+
+          <div id="bytecode" class="tab-content"></div>
+
+          <div id="input-row">
+            <input
+              type="text"
+              id="user-input-field"
+              placeholder="Enter input..."
+              onkeydown="if (event.key === 'Enter') submitInput();"
+            />
+
+            <button onclick="submitInput()">Send</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="ai-modal" class="ai-modal" aria-hidden="true">
+      <div
+        class="ai-modal-card"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="ai-title"
+      >
+        <div class="ai-modal-header">
+          <h3 id="ai-title">AI Review</h3>
+          <button class="ai-close-btn" onclick="closeAiModal()">Close</button>
+        </div>
+        <div class="ai-modal-body">
+          <div id="ai-status" class="ai-status"></div>
+          <div id="ai-message" class="ai-message"></div>
+          <pre id="ai-fixed-code" class="ai-fixed-code"></pre>
+        </div>
+        <div class="ai-modal-actions">
+          <button
+            type="button"
+            class="run-btn ai-ok-btn"
+            id="ai-ok-btn"
+            onclick="closeAiModal()"
+          >
+            OK
+          </button>
+          <button
+            type="button"
+            class="run-btn"
+            id="apply-fix-btn"
+            onclick="applyAiFix()"
+          >
+            Apply Fix
+          </button>
+        </div>
+      </div>
     </div>
     <div id="editor-menu">
-    <div class="menu-item" onclick="menuCut()">Cut</div>
-    <div class="menu-item" onclick="menuCopy()">Copy</div>
-    <div class="menu-item" onclick="menuPaste()">Paste</div>
-</div>
+      <div class="menu-item" onclick="menuCut()">Cut</div>
+      <div class="menu-item" onclick="menuCopy()">Copy</div>
+      <div class="menu-item" onclick="menuPaste()">Paste</div>
+    </div>
     <script src="https://unpkg.com/monaco-editor@latest/min/vs/loader.js"></script>
 
     <script>
+      require.config({
+        paths: { vs: "https://unpkg.com/monaco-editor@latest/min/vs" },
+      });
 
-        require.config({ paths: { vs: 'https://unpkg.com/monaco-editor@latest/min/vs' } });
+      require(["vs/editor/editor.main"], function () {
+        monaco.editor.defineTheme("formal-dark", {
+          base: "vs-dark",
+          inherit: true,
 
-        require(["vs/editor/editor.main"], function () {
+          rules: [
+            { token: "comment", foreground: "2ECDA8", fontStyle: "italic" },
+            { token: "keyword", foreground: "BB86FC" },
+            { token: "string", foreground: "FF7597" },
+            { token: "number", foreground: "00DCC0" },
+            { token: "identifier", foreground: "C2D8F0" },
+          ],
 
-            monaco.editor.defineTheme("formal-dark", {
-
-                base: "vs-dark",
-                inherit: true,
-
-                rules: [
-
-                    { token: "comment",    foreground: "2ECDA8", fontStyle: "italic" },
-                    { token: "keyword",    foreground: "BB86FC" },
-                    { token: "string",     foreground: "FF7597" },
-                    { token: "number",     foreground: "00DCC0" },
-                    { token: "identifier", foreground: "C2D8F0" }
-
-                ],
-
-                colors: {
-                    "editor.background":                    "#04101C",
-                    "editor.lineHighlightBackground":       "#081828",
-                    "editorCursor.foreground":              "#00DCC0",
-                    "editor.selectionBackground":           "#0E2840",
-                    "editorLineNumber.foreground":          "#264A6A",
-                    "editorLineNumber.activeForeground":    "#C2D8F0",
-                    "editorSuggestWidget.background":       "#091C30",
-                    "editorSuggestWidget.border":           "#172A40",
-                    "editorSuggestWidget.foreground":       "#C2D8F0",
-                    "editorSuggestWidget.selectedBackground": "#0D2845",
-                    "editorSuggestWidget.highlightForeground": "#00DCC0",
-                    "editorHoverWidget.background":         "#0A1828",
-                    "editorHoverWidget.border":             "#172A40",
-                    "editorWidget.background":              "#0A1828",
-                    "editorWidget.border":                  "#172A40"
-                }
-
-            });
-
-            monaco.editor.defineTheme("formal-light", {
-
-                base: "vs",
-                inherit: true,
-
-                rules: [
-
-                    { token: "comment", foreground: "16A34A", fontStyle: "italic" },
-                    { token: "keyword", foreground: "4338CA" },
-                    { token: "string", foreground: "B91C1C" },
-                    { token: "number", foreground: "059669" },
-                    { token: "identifier", foreground: "0F172A" }
-
-                ],
-
-                colors: {
-                    "editor.background": "#FFFFFF",
-                    "editor.lineHighlightBackground": "#F3F6FB",
-                    "editorCursor.foreground": "#0B1220",
-                    "editor.selectionBackground": "#DCE7FF",
-                    "editorLineNumber.foreground": "#9AA4B2",
-                    "editorLineNumber.activeForeground": "#0F172A",
-                    "editorSuggestWidget.background": "#ACE4D4",
-                    "editorSuggestWidget.border": "#CBD5E1",
-                    "editorSuggestWidget.foreground": "#0B1220",
-                    "editorSuggestWidget.selectedBackground": "#456990",
-                    "editorSuggestWidget.highlightForeground": "#2563EB",
-                    "editorHoverWidget.background": "#FFFFFF",
-                    "editorHoverWidget.border": "#CBD5E1",
-                    "editorWidget.background": "#FFFFFF",
-                    "editorWidget.border": "#CBD5E1"
-                }
-
-            });
-
-            window.editor = monaco.editor.create(document.getElementById("editor"), {
-
-                value: `print("Hello Brainware")`,
-                language: "python",
-                theme: "formal-light",
-
-                automaticLayout: true,
-
-                fontSize: 15,
-                fontFamily: "'Fira Code', Consolas, monospace",
-                fontLigatures: true,
-                contextmenu: false,
-
-                cursorBlinking: "smooth",
-                cursorStyle: "line",
-
-                minimap: { enabled: false },
-                scrollBeyondLastLine: false,
-                wordWrap: "on",
-
-                padding: { top: 16, bottom: 16 }
-
-            });
-
-            const _savedTheme = localStorage.getItem('pyflux-theme');
-            if (_savedTheme === 'dark') {
-                document.body.setAttribute('data-theme', 'dark');
-                monaco.editor.setTheme('formal-dark');
-                const cb = document.getElementById('theme-checkbox');
-                if (cb) cb.checked = false;
-            }
-
-            editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyP, function () { });
-
-            editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyP, function () { });
-
-            editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, function () {
-
-                if (typeof runCode === 'function') {
-                    runCode();
-                }
-
-            });
-
+          colors: {
+            "editor.background": "#04101C",
+            "editor.lineHighlightBackground": "#081828",
+            "editorCursor.foreground": "#00DCC0",
+            "editor.selectionBackground": "#0E2840",
+            "editorLineNumber.foreground": "#264A6A",
+            "editorLineNumber.activeForeground": "#C2D8F0",
+            "editorSuggestWidget.background": "#091C30",
+            "editorSuggestWidget.border": "#172A40",
+            "editorSuggestWidget.foreground": "#C2D8F0",
+            "editorSuggestWidget.selectedBackground": "#0D2845",
+            "editorSuggestWidget.highlightForeground": "#00DCC0",
+            "editorHoverWidget.background": "#0A1828",
+            "editorHoverWidget.border": "#172A40",
+            "editorWidget.background": "#0A1828",
+            "editorWidget.border": "#172A40",
+          },
         });
 
+        monaco.editor.defineTheme("formal-light", {
+          base: "vs",
+          inherit: true,
+
+          rules: [
+            { token: "comment", foreground: "16A34A", fontStyle: "italic" },
+            { token: "keyword", foreground: "4338CA" },
+            { token: "string", foreground: "B91C1C" },
+            { token: "number", foreground: "059669" },
+            { token: "identifier", foreground: "0F172A" },
+          ],
+
+          colors: {
+            "editor.background": "#FFFFFF",
+            "editor.lineHighlightBackground": "#F3F6FB",
+            "editorCursor.foreground": "#0B1220",
+            "editor.selectionBackground": "#DCE7FF",
+            "editorLineNumber.foreground": "#9AA4B2",
+            "editorLineNumber.activeForeground": "#0F172A",
+            "editorSuggestWidget.background": "#ACE4D4",
+            "editorSuggestWidget.border": "#CBD5E1",
+            "editorSuggestWidget.foreground": "#0B1220",
+            "editorSuggestWidget.selectedBackground": "#456990",
+            "editorSuggestWidget.highlightForeground": "#2563EB",
+            "editorHoverWidget.background": "#FFFFFF",
+            "editorHoverWidget.border": "#CBD5E1",
+            "editorWidget.background": "#FFFFFF",
+            "editorWidget.border": "#CBD5E1",
+          },
+        });
+
+        window.editor = monaco.editor.create(
+          document.getElementById("editor"),
+          {
+            value: `print("Hello Brainware")`,
+            language: "python",
+            theme: "formal-light",
+
+            automaticLayout: true,
+
+            fontSize: 15,
+            fontFamily: "'Fira Code', Consolas, monospace",
+            fontLigatures: true,
+            contextmenu: false,
+
+            cursorBlinking: "smooth",
+            cursorStyle: "line",
+
+            minimap: { enabled: false },
+            scrollBeyondLastLine: false,
+            wordWrap: "on",
+
+            padding: { top: 16, bottom: 16 },
+          },
+        );
+
+        const _savedTheme = localStorage.getItem("pyflux-theme");
+        if (_savedTheme === "dark") {
+          document.body.setAttribute("data-theme", "dark");
+          monaco.editor.setTheme("formal-dark");
+          const cb = document.getElementById("theme-checkbox");
+          if (cb) cb.checked = false;
+        }
+
+        editor.addCommand(
+          monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyP,
+          function () {},
+        );
+
+        editor.addCommand(
+          monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyP,
+          function () {},
+        );
+
+        editor.addCommand(
+          monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
+          function () {
+            if (typeof runCode === "function") {
+              runCode();
+            }
+          },
+        );
+      });
     </script>
 
     <script src="{{ url_for('static', filename='script.js') }}"></script>
-
-</body>
-
+  </body>
 </html>
