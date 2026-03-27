@@ -24,7 +24,7 @@ body {
 
   background-size: 28px 28px;
 
-  font-family: "Inter", sans-serif;
+  font-family: "Google Sans Flex", "Google Sans", "Segoe UI", sans-serif;
   color: var(--text-main);
 
   display: flex;
@@ -122,7 +122,7 @@ body {
   overflow: hidden;
 }
 
-@media (min-width: 768px) {
+@media (min-width: 1100px) {
   .workspace {
     flex-direction: row;
   }
@@ -148,6 +148,7 @@ body {
   flex-direction: column;
 
   background: var(--output-bg);
+  border-right: 1px solid var(--border-color);
 }
 
 .tab-bar {
@@ -429,7 +430,7 @@ body {
   border: 1px solid #e2e8f0;
   border-radius: 10px;
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.12);
-  font-family: "Inter", sans-serif;
+  font-family: "Google Sans Flex", "Google Sans", "Segoe UI", sans-serif;
   font-size: 13px;
   z-index: 1000;
   padding: 6px;
@@ -446,50 +447,64 @@ body {
   background: #eef2ff;
 }
 
-.ai-modal {
-  position: fixed;
-  inset: 0;
-  display: none;
-  align-items: center;
-  justify-content: center;
-  background: rgba(15, 23, 42, 0.45);
-  z-index: 2000;
-  padding: 20px;
-}
-
-.ai-modal.active {
-  display: flex;
-}
-
-.ai-modal-card {
-  width: min(760px, 92vw);
-  max-height: 86vh;
-  background: var(--surface-color);
-  color: var(--text-main);
-  border: 1px solid var(--border-color);
-  border-radius: 14px;
-  box-shadow: var(--shadow-soft);
+.ai-pane {
+  flex: 0.9;
+  min-width: 280px;
+  max-width: 420px;
   display: flex;
   flex-direction: column;
+  background: var(--surface-color);
+  border-left: 1px solid var(--border-color);
   overflow: hidden;
 }
 
-.ai-modal-header {
+.ai-pane.is-hidden {
+  display: none;
+}
+
+.ai-pane-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 18px;
+  gap: 16px;
+  padding: 14px 16px;
   border-bottom: 1px solid var(--border-color);
   background: linear-gradient(to bottom, #ffffff, #f9fbff);
 }
 
-.ai-modal-header h3 {
+.ai-pane-title h3 {
   margin: 0;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
 }
 
-.ai-close-btn {
+.ai-pending-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  background: rgba(254, 242, 242, 0.9);
+  color: #b91c1c;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ai-pending-badge.is-hidden {
+  display: none;
+}
+
+.ai-pane-title p {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.ai-clear-btn {
   border: 1px solid var(--border-color);
   background: transparent;
   color: var(--text-main);
@@ -499,56 +514,86 @@ body {
   cursor: pointer;
 }
 
-.ai-modal-body {
-  padding: 16px 18px;
+.ai-chat {
+  flex: 1;
+  padding: 14px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  overflow: auto;
+  gap: 12px;
+  overflow-y: auto;
+  background: var(--output-bg);
 }
 
-.ai-status {
-  font-size: 11px;
+.ai-chat-empty {
+  border: 1px dashed var(--border-color);
+  border-radius: 12px;
+  padding: 18px;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
+}
+
+.ai-chat-entry {
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.04);
+}
+
+.ai-chat-entry.ai-error {
+  border-color: rgba(239, 68, 68, 0.4);
+  background: rgba(254, 242, 242, 0.65);
+}
+
+.ai-chat-entry.ai-ok {
+  border-color: rgba(16, 185, 129, 0.35);
+  background: rgba(236, 253, 245, 0.75);
+}
+
+.ai-chat-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--text-muted);
 }
 
-.ai-message {
-  font-size: 14px;
+.ai-chat-message {
+  font-size: 13px;
   color: var(--text-main);
+  line-height: 1.5;
 }
 
-.ai-fixed-code {
+.ai-chat-code {
   margin: 0;
-  padding: 12px;
+  padding: 10px;
   border-radius: 10px;
   border: 1px solid var(--border-color);
   background: var(--output-bg);
   font-family: "Fira Code", monospace;
   font-size: 12px;
   white-space: pre-wrap;
-  max-height: 40vh;
+  max-height: 240px;
   overflow: auto;
 }
 
-.ai-modal-actions {
+.ai-chat-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
-  padding: 12px 18px;
-  border-top: 1px solid var(--border-color);
-  background: #ffffff;
 }
 
-.ai-ok-btn {
-  background: #64748b;
-  box-shadow: none;
-}
-
-.ai-modal-actions .run-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.ai-chat-actions .ai-apply-btn {
+  padding: 6px 12px;
+  font-size: 12px;
   box-shadow: none;
 }
 
@@ -688,29 +733,45 @@ body[data-theme="dark"] .menu-item:hover {
   background: #102840;
 }
 
-body[data-theme="dark"] .ai-modal {
-  background: rgba(2, 6, 23, 0.72);
+body[data-theme="dark"] .ai-pane {
+  background: #0a1828;
 }
 
-body[data-theme="dark"] .ai-modal-header {
+body[data-theme="dark"] .ai-pane-header {
   background: linear-gradient(to bottom, #0e1e34, #0a1828);
   border-bottom-color: var(--border-color);
 }
 
-body[data-theme="dark"] .ai-close-btn {
+body[data-theme="dark"] .ai-clear-btn {
   background: #0a1828;
   border-color: #1e3450;
   color: var(--text-main);
 }
 
-body[data-theme="dark"] .ai-modal-actions {
-  background: #0a1828;
-  border-top-color: var(--border-color);
+body[data-theme="dark"] .ai-chat {
+  background: #06101c;
 }
 
-body[data-theme="dark"] .ai-ok-btn {
-  background: #1f3248;
-  box-shadow: none;
+body[data-theme="dark"] .ai-chat-entry {
+  background: #0c1a2e;
+  border-color: #1e3450;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.25);
+}
+
+body[data-theme="dark"] .ai-chat-entry.ai-error {
+  background: rgba(127, 29, 29, 0.2);
+  border-color: rgba(248, 113, 113, 0.35);
+}
+
+body[data-theme="dark"] .ai-chat-entry.ai-ok {
+  background: rgba(5, 46, 22, 0.25);
+  border-color: rgba(52, 211, 153, 0.35);
+}
+
+body[data-theme="dark"] .ai-pending-badge {
+  background: rgba(127, 29, 29, 0.3);
+  border-color: rgba(248, 113, 113, 0.4);
+  color: #fca5a5;
 }
 
 body[data-theme="dark"] .ast-tree ul ul {

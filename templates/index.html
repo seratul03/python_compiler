@@ -101,42 +101,26 @@
             <button onclick="submitInput()">Send</button>
           </div>
         </div>
-      </div>
-    </div>
-    <div id="ai-modal" class="ai-modal" aria-hidden="true">
-      <div
-        class="ai-modal-card"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="ai-title"
-      >
-        <div class="ai-modal-header">
-          <h3 id="ai-title">AI Review</h3>
-          <button class="ai-close-btn" onclick="closeAiModal()">Close</button>
-        </div>
-        <div class="ai-modal-body">
-          <div id="ai-status" class="ai-status"></div>
-          <div id="ai-message" class="ai-message"></div>
-          <pre id="ai-fixed-code" class="ai-fixed-code"></pre>
-        </div>
-        <div class="ai-modal-actions">
-          <button
-            type="button"
-            class="run-btn ai-ok-btn"
-            id="ai-ok-btn"
-            onclick="closeAiModal()"
-          >
-            OK
-          </button>
-          <button
-            type="button"
-            class="run-btn"
-            id="apply-fix-btn"
-            onclick="applyAiFix()"
-          >
-            Apply Fix
-          </button>
-        </div>
+
+        <aside class="ai-pane is-hidden" id="ai-pane" aria-hidden="true">
+          <div class="ai-pane-header">
+            <div class="ai-pane-title">
+              <h3>AI Chat</h3>
+              <span class="ai-pending-badge" id="ai-pending-badge">
+                Pending Fix
+              </span>
+              <p>Errors and suggested fixes show up here. Applying fixes is optional.</p>
+            </div>
+            <button type="button" class="ai-clear-btn" onclick="clearAiChat()">
+              Clear
+            </button>
+          </div>
+          <div class="ai-chat" id="ai-chat">
+            <div class="ai-chat-empty" id="ai-chat-empty">
+              AI feedback will appear after you run the code.
+            </div>
+          </div>
+        </aside>
       </div>
     </div>
     <div id="editor-menu">
