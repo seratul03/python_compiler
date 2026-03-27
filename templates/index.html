@@ -26,9 +26,24 @@
   <body>
     <div class="app-container">
       <header class="app-header">
-        <h2>PyFlux</h2>
+        <h2 class="app-title">PyFlux</h2>
 
-        <div style="display: flex; gap: 14px; align-items: center">
+        <div class="filename-bar" aria-label="Filename">
+          <label class="filename-label" for="filename-input">Filename</label>
+          <input
+            type="text"
+            id="filename-input"
+            value="main.py"
+            maxlength="80"
+            spellcheck="false"
+            autocomplete="off"
+          />
+          <button type="button" class="run-btn save-btn" onclick="downloadCode()">
+            Save
+          </button>
+        </div>
+
+        <div class="header-actions">
           <label class="switch" title="Toggle dark / light theme">
             <input
               type="checkbox"

@@ -6,10 +6,69 @@ const aiPaneEl = document.getElementById("ai-pane");
 const aiChatEl = document.getElementById("ai-chat");
 const aiChatEmptyEl = document.getElementById("ai-chat-empty");
 const aiPendingBadgeEl = document.getElementById("ai-pending-badge");
+const filenameInputEl = document.getElementById("filename-input");
+
+const DEFAULT_FILENAME_BASE = "main";
+const FILENAME_STORAGE_KEY = "pyflux-filename";
 
 let aiPrecheckShown = false;
 let aiPostcheckShown = false;
 let aiHasError = false;
+
+function normalizeFilenameBase(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return DEFAULT_FILENAME_BASE;
+
+  const sanitized = raw.replace(/[\\/?:%*|"<>]/g, "-");
+  const base = sanitized.replace(/\.[^/.]+$/, "").trim();
+  return base || DEFAULT_FILENAME_BASE;
+}
+
+function getFilenameBase() {
+  if (!filenameInputEl) return DEFAULT_FILENAME_BASE;
+  const normalized = normalizeFilenameBase(filenameInputEl.value);
+  filenameInputEl.value = normalized;
+  localStorage.setItem(FILENAME_STORAGE_KEY, normalized);
+  return normalized;
+}
+
+function getDownloadFilename() {
+  return getFilenameBase() + ".py";
+}
+
+function downloadCode() {
+  if (!window.editor) return;
+  const filename = getDownloadFilename();
+  const code = editor.getValue();
+  const blob = new Blob([code], { type: "text/x-python;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+if (filenameInputEl) {
+  const savedName = localStorage.getItem(FILENAME_STORAGE_KEY);
+  if (savedName) {
+    filenameInputEl.value = normalizeFilenameBase(savedName);
+  }
+
+  filenameInputEl.addEventListener("blur", () => {
+    getFilenameBase();
+  });
+
+  filenameInputEl.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      downloadCode();
+    }
+  });
+}
 
 function setAiPaneOpen(isOpen) {
   if (!aiPaneEl) return;
