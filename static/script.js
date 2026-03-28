@@ -100,11 +100,25 @@ function clearAiChat() {
   setAiPendingBadge(false);
 }
 
-function applyAiFix(fixedCode) {
+function applyAiFix(fixedCode, entryEl) {
   if (!fixedCode || !window.editor) return;
   editor.setValue(fixedCode);
-  aiHasError = false;
-  setAiPendingBadge(false);
+  if (entryEl && entryEl.parentNode) {
+    entryEl.parentNode.removeChild(entryEl);
+  }
+
+  const hasErrorEntry = Boolean(
+    aiChatEl && aiChatEl.querySelector(".ai-chat-entry.ai-error"),
+  );
+  aiHasError = hasErrorEntry;
+  setAiPendingBadge(hasErrorEntry);
+
+  if (aiChatEl && !aiChatEl.querySelector(".ai-chat-entry")) {
+    if (aiChatEmptyEl && !aiChatEmptyEl.parentElement) {
+      aiChatEl.appendChild(aiChatEmptyEl);
+    }
+    showAiEmptyState();
+  }
 }
 
 function showAiMessage(result, sourceLabel) {
@@ -160,7 +174,7 @@ function showAiMessage(result, sourceLabel) {
     applyBtn.className = "run-btn ai-apply-btn";
     applyBtn.textContent = "Apply Fix";
     applyBtn.addEventListener("click", function () {
-      applyAiFix(fixedCode);
+      applyAiFix(fixedCode, entry);
     });
 
     actions.appendChild(applyBtn);
