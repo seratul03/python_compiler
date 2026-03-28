@@ -7,13 +7,19 @@ const aiChatEl = document.getElementById("ai-chat");
 const aiChatEmptyEl = document.getElementById("ai-chat-empty");
 const aiPendingBadgeEl = document.getElementById("ai-pending-badge");
 const filenameInputEl = document.getElementById("filename-input");
+const aiUserInputEl = document.getElementById("ai-user-input");
+const aiSendBtnEl = document.getElementById("ai-send-btn");
 
 const DEFAULT_FILENAME_BASE = "main";
 const FILENAME_STORAGE_KEY = "pyflux-filename";
+const INPUT_MARKER = "__PYFLUX_INPUT__";
 
 let aiPrecheckShown = false;
 let aiPostcheckShown = false;
 let aiHasError = false;
+let aiChatHistory = [];
+let aiChatBusy = false;
+let lastRuntimeError = "";
 
 function normalizeFilenameBase(value) {
   const raw = String(value || "").trim();
@@ -97,28 +103,43 @@ function clearAiChat() {
   }
   showAiEmptyState();
   aiHasError = false;
+  aiChatHistory = [];
   setAiPendingBadge(false);
 }
 
-function applyAiFix(fixedCode, entryEl) {
-  if (!fixedCode || !window.editor) return;
-  editor.setValue(fixedCode);
-  if (entryEl && entryEl.parentNode) {
-    entryEl.parentNode.removeChild(entryEl);
-  }
+function clearAiReviewEntries() {
+  if (!aiChatEl) return;
+  aiChatEl
+    .querySelectorAll('.ai-chat-entry[data-entry-type="review"]')
+    .forEach((entry) => entry.remove());
 
-  const hasErrorEntry = Boolean(
-    aiChatEl && aiChatEl.querySelector(".ai-chat-entry.ai-error"),
-  );
-  aiHasError = hasErrorEntry;
-  setAiPendingBadge(hasErrorEntry);
-
-  if (aiChatEl && !aiChatEl.querySelector(".ai-chat-entry")) {
+  const hasAnyEntry = Boolean(aiChatEl.querySelector(".ai-chat-entry"));
+  if (!hasAnyEntry) {
     if (aiChatEmptyEl && !aiChatEmptyEl.parentElement) {
       aiChatEl.appendChild(aiChatEmptyEl);
     }
     showAiEmptyState();
   }
+
+  aiHasError = Boolean(aiChatEl.querySelector(".ai-chat-entry.ai-error"));
+  setAiPendingBadge(aiHasError);
+}
+
+function applyAiFix(fixedCode, entryEl) {
+  if (!fixedCode || !window.editor) return;
+  editor.setValue(fixedCode);
+
+  if (entryEl) {
+    const codeBlock = entryEl.querySelector(".ai-chat-code");
+    if (codeBlock && codeBlock.parentNode) {
+      codeBlock.parentNode.remove();
+    }
+    entryEl.classList.remove("ai-error");
+    entryEl.classList.add("ai-ok");
+  }
+
+  aiHasError = Boolean(aiChatEl && aiChatEl.querySelector(".ai-chat-entry.ai-error"));
+  setAiPendingBadge(aiHasError);
 }
 
 function showAiMessage(result, sourceLabel) {
@@ -130,13 +151,14 @@ function showAiMessage(result, sourceLabel) {
     return;
   }
   const message = isOk
-    ? "Your code looks good to run."
+    ? result.message || "Review complete."
     : result.message || "AI detected an issue.";
 
   hideAiEmptyState();
 
   const entry = document.createElement("div");
   entry.className = "ai-chat-entry " + (isOk ? "ai-ok" : "ai-error");
+  entry.dataset.entryType = "review";
 
   const meta = document.createElement("div");
   meta.className = "ai-chat-meta";
@@ -194,6 +216,234 @@ function showAiMessage(result, sourceLabel) {
   }
 }
 
+function appendChatEntry(role, text) {
+  if (!aiChatEl) return;
+  hideAiEmptyState();
+
+  const entry = document.createElement("div");
+  const isUser = role === "user";
+  entry.className = "ai-chat-entry " + (isUser ? "ai-user" : "ai-assistant");
+  entry.dataset.entryType = "chat";
+
+  const meta = document.createElement("div");
+  meta.className = "ai-chat-meta";
+
+  const source = document.createElement("span");
+  source.className = "ai-chat-source";
+  source.textContent = isUser ? "You" : "PyFlux";
+
+  const statusEl = document.createElement("span");
+  statusEl.className = "ai-chat-status";
+  statusEl.textContent = isUser ? "USER" : "AI";
+
+  meta.appendChild(source);
+  meta.appendChild(statusEl);
+
+  entry.appendChild(meta);
+
+  if (isUser) {
+    const msg = document.createElement("div");
+    msg.className = "ai-chat-message";
+    msg.textContent = text || "";
+    entry.appendChild(msg);
+  } else {
+    const content = document.createElement("div");
+    content.className = "ai-chat-message";
+
+    const segments = parseChatSegments(text || "");
+    segments.forEach((segment) => {
+      if (segment.type === "code") {
+        const block = document.createElement("div");
+        block.className = "ai-code-block";
+
+        const codeBlock = document.createElement("pre");
+        codeBlock.className = "ai-chat-code";
+        codeBlock.textContent = segment.content;
+        block.appendChild(codeBlock);
+
+        const codeActions = document.createElement("div");
+        codeActions.className = "ai-chat-actions";
+
+        const applyBtn = document.createElement("button");
+        applyBtn.type = "button";
+        applyBtn.className = "run-btn ai-apply-btn";
+        applyBtn.textContent = "Apply";
+        applyBtn.addEventListener("click", function () {
+          applyChatCode(segment.content);
+        });
+
+        const insertBtn = document.createElement("button");
+        insertBtn.type = "button";
+        insertBtn.className = "ai-insert-btn";
+        insertBtn.textContent = "Insert";
+        insertBtn.addEventListener("click", function () {
+          insertChatCode(segment.content);
+        });
+
+        codeActions.appendChild(applyBtn);
+        codeActions.appendChild(insertBtn);
+        block.appendChild(codeActions);
+        content.appendChild(block);
+      } else if (segment.content.trim()) {
+        segment.content
+          .split(/\n{2,}/)
+          .map((part) => part.trim())
+          .filter(Boolean)
+          .forEach((part) => {
+            const para = document.createElement("div");
+            para.className = "ai-chat-paragraph";
+            para.textContent = part;
+            content.appendChild(para);
+          });
+      }
+    });
+
+    entry.appendChild(content);
+
+    const actions = document.createElement("div");
+    actions.className = "ai-chat-actions ai-chat-entry-actions";
+
+    const okBtn = document.createElement("button");
+    okBtn.type = "button";
+    okBtn.className = "ai-ok-btn";
+    okBtn.textContent = "Okay";
+    okBtn.addEventListener("click", function () {
+      if (entry.classList.contains("ai-acknowledged")) {
+        entry.classList.remove("ai-acknowledged");
+        okBtn.textContent = "Okay";
+      } else {
+        entry.classList.add("ai-acknowledged");
+        okBtn.textContent = "Expand";
+      }
+    });
+
+    actions.appendChild(okBtn);
+    entry.appendChild(actions);
+  }
+
+  aiChatEl.appendChild(entry);
+  aiChatEl.scrollTop = aiChatEl.scrollHeight;
+}
+
+function parseChatSegments(text) {
+  const segments = [];
+  if (!text) return segments;
+
+  const regex = /```([a-zA-Z0-9_-]+)?\n([\s\S]*?)```/g;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      segments.push({ type: "text", content: text.slice(lastIndex, match.index) });
+    }
+    const code = (match[2] || "").trimEnd();
+    segments.push({ type: "code", content: code, lang: match[1] || "" });
+    lastIndex = regex.lastIndex;
+  }
+
+  if (lastIndex < text.length) {
+    segments.push({ type: "text", content: text.slice(lastIndex) });
+  }
+
+  return segments;
+}
+
+function applyChatCode(code) {
+  if (!code || !window.editor) return;
+  editor.setValue(code);
+}
+
+function insertChatCode(code) {
+  if (!code || !window.editor) return;
+  const selection = editor.getSelection && editor.getSelection();
+  if (!selection) {
+    editor.setValue(editor.getValue() + code);
+    return;
+  }
+
+  editor.executeEdits("ai-chat", [
+    {
+      range: selection,
+      text: code,
+      forceMoveMarkers: true,
+    },
+  ]);
+  editor.focus();
+}
+
+function removeChatEntry(entry) {
+  if (entry && entry.parentNode) {
+    entry.parentNode.removeChild(entry);
+  }
+  if (aiChatEl && !aiChatEl.querySelector(".ai-chat-entry")) {
+    if (aiChatEmptyEl && !aiChatEmptyEl.parentElement) {
+      aiChatEl.appendChild(aiChatEmptyEl);
+    }
+    showAiEmptyState();
+  }
+}
+
+function formatErrorText(err) {
+  if (!err) return "";
+  if (typeof err === "string") return err;
+  if (typeof err === "object") {
+    const type = err.type ? String(err.type) : "";
+    const message = err.message ? String(err.message) : "";
+    if (type && message) return type + ": " + message;
+    return message || type;
+  }
+  return String(err);
+}
+
+function sendAiChat() {
+  if (!aiUserInputEl || aiChatBusy) return;
+  const message = aiUserInputEl.value.trim();
+  if (!message) return;
+
+  aiUserInputEl.value = "";
+  appendChatEntry("user", message);
+  aiChatHistory.push({ role: "user", content: message });
+
+  aiChatBusy = true;
+  if (aiSendBtnEl) aiSendBtnEl.disabled = true;
+
+  const payload = {
+    message: message,
+    code: window.editor ? editor.getValue() : "",
+    error: lastRuntimeError,
+    history: aiChatHistory.slice(-12),
+  };
+
+  fetch("/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  })
+    .then((res) => res.json())
+    .then((data) => {
+      if (data.error) {
+        const errorMessage = "AI error: " + data.error;
+        appendChatEntry("assistant", errorMessage);
+        aiChatHistory.push({ role: "assistant", content: errorMessage });
+        return;
+      }
+
+      const reply = String(data.reply || "").trim() || "I could not generate a response.";
+      appendChatEntry("assistant", reply);
+      aiChatHistory.push({ role: "assistant", content: reply });
+    })
+    .catch(() => {
+      const errorMessage = "AI error: could not reach server.";
+      appendChatEntry("assistant", errorMessage);
+      aiChatHistory.push({ role: "assistant", content: errorMessage });
+    })
+    .finally(() => {
+      aiChatBusy = false;
+      if (aiSendBtnEl) aiSendBtnEl.disabled = false;
+    });
+}
+
 if (aiToggleEl) {
   setAiPaneOpen(aiToggleEl.checked);
   setAiPendingBadge(aiHasError);
@@ -201,6 +451,15 @@ if (aiToggleEl) {
     setAiPaneOpen(aiToggleEl.checked);
     if (aiToggleEl.checked && aiChatEl) {
       aiChatEl.scrollTop = aiChatEl.scrollHeight;
+    }
+  });
+}
+
+if (aiUserInputEl) {
+  aiUserInputEl.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      sendAiChat();
     }
   });
 }
@@ -248,7 +507,6 @@ function isAiModeEnabled() {
 
 let currentPid = null;
 let pollTimer = null;
-let emptyPollCount = 0;
 let isWaitingForInput = false;
 let sessionOutput = "";
 
@@ -311,15 +569,27 @@ function switchTab(tab) {
   });
 }
 
+function stripInputMarkers(text) {
+  if (!text) return { text: "", sawMarker: false };
+  let sawMarker = false;
+  const regex = new RegExp(INPUT_MARKER + "\\r?\\n?", "g");
+  const cleaned = text.replace(regex, () => {
+    sawMarker = true;
+    return "";
+  });
+  return { text: cleaned, sawMarker };
+}
+
 function runCode() {
   const code = editor.getValue();
   const outputBox = outputBoxEl;
 
   stopSession();
-  clearAiChat();
+  clearAiReviewEntries();
   aiPrecheckShown = false;
   aiPostcheckShown = false;
   aiHasError = false;
+  lastRuntimeError = "";
 
   outputBox.innerText = "Running...";
   setOutputStatus("normal");
@@ -338,6 +608,7 @@ function runCode() {
     .then((data) => {
       if (data.error) {
         stopAllBuildingAnimations();
+        lastRuntimeError = formatErrorText(data.error);
         outputBox.innerText =
           typeof data.error === "object"
             ? data.error.type + ":\n" + data.error.message
@@ -347,7 +618,6 @@ function runCode() {
       }
 
       currentPid = data.pid;
-      emptyPollCount = 0;
       isWaitingForInput = false;
       sessionOutput = "";
       outputBox.innerText = "";
@@ -385,23 +655,20 @@ function pollOutput() {
 
       if (data.error) {
         stopSession();
+        lastRuntimeError = formatErrorText(data.error);
         outputBox.innerText = sessionOutput + "\n" + data.error;
         setOutputStatus("error");
         return;
       }
 
       if (data.output) {
-        sessionOutput += data.output;
-        outputBox.innerText = sessionOutput;
-        outputBox.scrollTop = outputBox.scrollHeight;
-        emptyPollCount = 0;
-        if (isWaitingForInput) {
-          hideInputRow();
-          isWaitingForInput = false;
+        const cleaned = stripInputMarkers(data.output);
+        if (cleaned.text) {
+          sessionOutput += cleaned.text;
+          outputBox.innerText = sessionOutput;
+          outputBox.scrollTop = outputBox.scrollHeight;
         }
-      } else if (!data.finished) {
-        emptyPollCount++;
-        if (emptyPollCount >= 5 && !isWaitingForInput) {
+        if (cleaned.sawMarker && !isWaitingForInput) {
           showInputRow();
         }
       }
@@ -409,6 +676,10 @@ function pollOutput() {
       if (data.ai_postcheck && !aiPostcheckShown) {
         showAiMessage(data.ai_postcheck, "Post-run Review");
         aiPostcheckShown = true;
+      }
+
+      if (data.runtime_error) {
+        lastRuntimeError = data.runtime_error;
       }
 
       if (data.finished) {
@@ -445,7 +716,6 @@ function submitInput() {
   outputBoxEl.innerText = sessionOutput;
 
   hideInputRow();
-  emptyPollCount = 0;
   isWaitingForInput = false;
 
   fetch(`/input/${currentPid}`, {
@@ -476,6 +746,7 @@ function resetCompiler() {
   aiPrecheckShown = false;
   aiPostcheckShown = false;
   aiHasError = false;
+  lastRuntimeError = "";
 
   const outputBox = outputBoxEl;
   outputBox.innerText = "";

@@ -144,6 +144,27 @@ SAFE_BUILTINS = {
     "subprocess": subprocess,
 }
 
+INPUT_MARKER = "__PYFLUX_INPUT__"
+INPUT_BOOTSTRAP = textwrap.dedent(
+    f"""\
+import builtins as __builtins__
+import sys as __sys__
+
+__pyflux_input_marker = {INPUT_MARKER!r}
+__pyflux_original_input = __builtins__.input
+
+def __pyflux_input(prompt=""):
+    if prompt:
+        __sys__.stdout.write(str(prompt))
+        __sys__.stdout.flush()
+    __sys__.stdout.write(__pyflux_input_marker + "\\n")
+    __sys__.stdout.flush()
+    return __pyflux_original_input()
+
+__builtins__.input = __pyflux_input
+"""
+)
+
 import importlib as _importlib
 for _mod_name in ("graphviz", "resource", "symtable", "codeop", "signal"):
     try:
@@ -182,6 +203,8 @@ def start_process(user_code, ai_mode=False):
     file_path = os.path.join(temp_dir, "main.py")
 
     with open(file_path, "w", encoding="utf-8") as f:
+        f.write(INPUT_BOOTSTRAP)
+        f.write("\n")
         f.write(user_code)
 
     process = subprocess.Popen(
@@ -193,7 +216,12 @@ def start_process(user_code, ai_mode=False):
         encoding="utf-8",
         cwd=temp_dir,
         bufsize=1,
-        env={**os.environ, "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"},
+        env={
+            **os.environ,
+            "PYTHONUTF8": "1",
+            "PYTHONIOENCODING": "utf-8",
+            "MPLBACKEND": "Agg",
+        },
     )
 
     pid = str(uuid.uuid4())
@@ -206,6 +234,7 @@ def start_process(user_code, ai_mode=False):
         "ai_mode": ai_mode,
         "code": user_code,
         "ai_post_result": None,
+        "start_time": time.perf_counter(),
     }
 
     def reader():
@@ -315,21 +344,30 @@ def read_output(pid):
         process_data["full_output"] += output
 
     if process.poll() is not None:
-        response = {"output": output, "finished": True}
+        duration = time.perf_counter() - process_data.get("start_time", time.perf_counter())
+        response = {"output": output, "finished": True, "runtime_seconds": duration}
 
         runtime_error = ""
         if process.returncode not in (0, None):
             runtime_error = process_data.get("full_output", "")
             response["runtime_error"] = runtime_error
 
-        if process_data.get("ai_mode") and runtime_error:
+        if process_data.get("ai_mode"):
             if process_data.get("ai_post_result") is None:
-                from ai.ai_checker import analyze_output
-                response_ai = analyze_output(
-                    process_data.get("code", ""),
-                    process_data.get("full_output", ""),
-                    runtime_error,
-                )
+                if runtime_error:
+                    from ai.ai_checker import analyze_output
+                    response_ai = analyze_output(
+                        process_data.get("code", ""),
+                        process_data.get("full_output", ""),
+                        runtime_error,
+                    )
+                else:
+                    from ai.ai_checker import review_success
+                    response_ai = review_success(
+                        process_data.get("code", ""),
+                        process_data.get("full_output", ""),
+                        response.get("runtime_seconds", 0.0),
+                    )
                 process_data["ai_post_result"] = response_ai
 
             response["ai_postcheck"] = process_data.get("ai_post_result")

@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify, render_template
-from ai.ai_checker import check_code, analyze_output
+import time
+from ai.ai_checker import check_code, analyze_output, chat_with_ai, review_success
 from execution.runner import (
     run_with_compiler,
     get_debug_info,
@@ -26,7 +27,10 @@ def run():
     ai_precheck = check_code(code) if ai_mode else None
 
     try:
+        start_time = time.perf_counter()
         result = run_with_compiler(code, True)
+        runtime_seconds = time.perf_counter() - start_time
+        result["runtime_seconds"] = runtime_seconds
         if ai_precheck is not None:
             result["ai_precheck"] = ai_precheck
 
@@ -39,6 +43,12 @@ def run():
 
             if error_text:
                 result["ai_postcheck"] = analyze_output(code, result.get("output", ""), error_text)
+        elif ai_mode:
+            result["ai_postcheck"] = review_success(
+                code,
+                result.get("output", ""),
+                runtime_seconds,
+            )
         return jsonify(result)
 
     except Exception as e:
@@ -78,6 +88,21 @@ def give_input(pid):
 def stop(pid):
     cleanup(pid)
     return jsonify({"status": "stopped"})
+
+
+@app.route("/chat", methods=["POST"])
+def chat():
+    data = request.json or {}
+    message = (data.get("message") or "").strip()
+    if not message:
+        return jsonify({"error": "Message is required."}), 400
+
+    code = data.get("code", "")
+    error = data.get("error", "")
+    history = data.get("history") or []
+
+    response = chat_with_ai(message, code=code, error=error, history=history)
+    return jsonify(response)
 
 
 if __name__ == "__main__":

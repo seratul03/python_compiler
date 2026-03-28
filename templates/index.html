@@ -124,16 +124,35 @@
               <span class="ai-pending-badge" id="ai-pending-badge">
                 Pending Fix
               </span>
-              <p>Errors and suggested fixes show up here. Applying fixes is optional.</p>
+              <p>Ask about code, errors, or improvements. Fixes are optional.</p>
             </div>
-            <button type="button" class="ai-clear-btn" onclick="clearAiChat()">
-              Clear
-            </button>
           </div>
           <div class="ai-chat" id="ai-chat">
-            <div class="ai-chat-empty" id="ai-chat-empty">
-              AI feedback will appear after you run the code.
+            <div class="ai-chat-toolbar">
+              <button type="button" class="ai-clear-btn" onclick="clearAiChat()">
+                Clear Chat
+              </button>
             </div>
+            <div class="ai-chat-empty" id="ai-chat-empty">
+              Ask the AI here or run code to see reviews.
+            </div>
+          </div>
+          <div class="ai-chat-controls">
+            <textarea
+              id="ai-user-input"
+              class="ai-user-input"
+              rows="2"
+              placeholder="Ask the AI about code, errors, or improvements..."
+              aria-label="Ask the AI"
+            ></textarea>
+            <button
+              type="button"
+              class="run-btn ai-send-btn"
+              id="ai-send-btn"
+              onclick="sendAiChat()"
+            >
+              Send
+            </button>
           </div>
         </aside>
       </div>

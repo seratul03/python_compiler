@@ -38,13 +38,25 @@ _ALLOWED_MODULES = {
     "gc", "platform", "socket", "ssl", "select", "errno", "ctypes",
 }
 
+_ALLOWED_PREFIXES = {
+    "numpy",
+    "pandas",
+    "matplotlib",
+    "sklearn",
+}
+
 
 def _import_module(name: str):
     """Import a module by name if it is in the allowed list."""
     if name not in _ALLOWED_MODULES:
-        raise ImportError(
-            f"Module '{name}' is not in the list of allowed imports."
+        allowed_by_prefix = any(
+            name == prefix or name.startswith(prefix + ".")
+            for prefix in _ALLOWED_PREFIXES
         )
+        if not allowed_by_prefix:
+            raise ImportError(
+                f"Module '{name}' is not in the list of allowed imports."
+            )
     import importlib
     return importlib.import_module(name)
 

@@ -5,22 +5,15 @@ from dotenv import load_dotenv
 load_dotenv()
 
 _GROQ_ENDPOINT = "https://api.groq.com/openai/v1/chat/completions"
-_MODEL = "llama-3.3-70b-versatile"
+_MODEL = os.getenv("GROQ_MODEL")
 
 
-def call_groq(prompt: str) -> str:
-    """Send a prompt to Groq and return the assistant response text."""
+def _post_groq(payload: dict) -> str:
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
         raise RuntimeError("GROQ_API_KEY is not set in .env")
-
-    payload = {
-        "model": _MODEL,
-        "messages": [
-            {"role": "user", "content": prompt}
-        ],
-        "temperature": 0.2,
-    }
+    if not _MODEL:
+        raise RuntimeError("GROQ_MODEL is not set in .env")
 
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -48,3 +41,23 @@ def call_groq(prompt: str) -> str:
         return data["choices"][0]["message"]["content"].strip()
     except (KeyError, IndexError, TypeError) as exc:
         raise RuntimeError("Unexpected Groq API response") from exc
+
+
+def call_groq(prompt: str) -> str:
+    """Send a prompt to Groq and return the assistant response text."""
+    payload = {
+        "model": _MODEL,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.2,
+    }
+    return _post_groq(payload)
+
+
+def call_groq_messages(messages: list[dict]) -> str:
+    """Send chat messages to Groq and return the assistant response text."""
+    payload = {
+        "model": _MODEL,
+        "messages": messages,
+        "temperature": 0.2,
+    }
+    return _post_groq(payload)

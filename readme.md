@@ -1,275 +1,137 @@
-# PyFlux — Custom Compiler & Web IDE
+# PyFlux Compiler + Web IDE
 
-A full, multi-stage compilation pipeline for a Python-like language, paired with a browser-based code editor. Write code, run it, and inspect every stage of compilation — AST, control flow graph, IR, and bytecode — all from one interface.
+PyFlux is a Python-like language compiler with a browser IDE. It lexes and parses source, runs semantic checks and AST optimizations, emits custom bytecode, and executes on a stack-based VM with a threshold-based JIT for hot functions. The web UI (Monaco Editor) lets you run code and inspect AST, CFG, and bytecode in one place.
 
----
+## Highlights
 
-## Features
+- Multi-stage compiler: lexer, parser, semantic checks, optimizer, bytecode generator, VM
+- Optional JIT: hot functions compile to native Python after a call threshold (default 10)
+- Web IDE: Monaco editor, AST tree, CFG view, and disassembled bytecode
+- Async execution: /start + /output polling with inline input() support
+- Optional AI mode: pre-run and post-run checks via Groq API
 
-- **11-stage compiler pipeline** — Lexer → Parser → Semantic Analyzer → Optimizer → IR → Bytecode Generator → Virtual Machine + JIT + CFG & AST visualizers
-- **Threshold-based JIT compiler** — hot functions are transpiled to native Python and cached after 10 calls, bypassing the interpreter loop entirely; transparent fallback on unsupported constructs
-- **Web IDE** — Monaco Editor (the same editor used in VS Code) served via Flask
-- **Interactive debug visualizations** — collapsible, color-coded AST tree; CFG graph; disassembled bytecode
-- **Intermediate Representation (IR)** — three-address code stage for further analysis and optimization
-- **Interactive execution** — programs that call `input()` prompt an inline input dialog in the browser
-- **AST optimizer** — constant folding, dead code elimination, branch simplification, algebraic rewrites
-- **OOP support** — classes, inheritance, `super()`, instance methods, `__str__()`, augmented attribute/index assignment
-- **Sandboxed execution** — code runs in isolated subprocesses with a restricted built-ins whitelist
-- **Security hardening** — blocks dangerous patterns (`import`, `open`, `eval`, `exec`, `__import__`) before execution
-- **Async process management** — long-running processes polled with thread-safe output buffering
-
----
-
-## Compilation Pipeline
+## Compilation pipeline
 
 ```
-Source Code
-    │
-    ▼
- Lexer                →  Token stream (40+ token types, indentation handling)
-    │
-    ▼
- Parser               →  Abstract Syntax Tree (42+ node types)
-    │
-    ▼
- Semantic Analyzer    →  Scope checking, variable & function validation
-    │
-    ▼
- Optimizer            →  Constant folding, dead code elimination,
-                          branch simplification, algebraic rewrites
-    │
-    ▼
- IR Generator         →  Three-address intermediate representation
-    │
-    ▼
- Bytecode Generator   →  Stack machine instructions (20+ opcodes)
-    │
-    ▼
- Virtual Machine      →  Frame-based execution; functions, classes,
-                          built-ins, break/continue, __str__
-    │
-    ▼
- JIT Compiler         →  Threshold-based (default: 10 calls); hot functions
-                          transpiled via PythonCodeGen → compile() → exec();
-                          cached callables bypass interpreter dispatch loop;
-                          transparent interpreter fallback on failure
+Source
+   -> Lexer (token stream)
+   -> Parser (AST)
+   -> Semantic analyzer (scopes, undefined names, loop rules)
+   -> AST optimizer (constant folding, dead code removal)
+   -> Bytecode generator (stack machine)
+   -> Virtual machine
+   -> JIT compiler (hot functions only)
 
- ─── Analysis stages (run in parallel) ───────────────────────────
- CFG Builder          →  Control Flow Graph (nodes + edges)
- AST Visualizer       →  JSON tree for interactive UI rendering
- Disassembler         →  Human-readable bytecode listing
+Analysis outputs (parallel to execution):
+   - AST visualizer
+   - CFG builder
+   - Bytecode disassembler
 ```
 
----
+## Web IDE and API
 
-## Getting Started
+The Flask app exposes a small API used by the UI:
+
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| GET | / | Web IDE |
+| POST | /run | Compile and run (sync). Returns output + AST/CFG/bytecode. |
+| POST | /start | Start async run. Returns PID + debug info. |
+| GET | /output/<pid> | Poll output for async run. |
+| POST | /input/<pid> | Send a line of input to a running process. |
+| POST | /stop/<pid> | Stop a running process. |
+
+## AI mode (optional)
+
+AI checks are optional and used only when the UI toggle is enabled. The backend calls Groq for:
+
+- Pre-run checks (basic fixes before execution)
+- Post-run analysis when a runtime error occurs
+- Chat-based help about code, errors, and improvements
+
+Set GROQ_API_KEY and GROQ_MODEL in a .env file to enable AI mode. Without them, the UI still works and the compiler runs normally.
+
+## Language support (Python-like)
+
+The parser and VM implement a wide slice of Python syntax, including:
+
+- Types: int, float, string, bool, None, list, tuple, dict, set
+- Expressions: arithmetic, comparison, boolean, bitwise, unary, ternary (x if c else y)
+- Control flow: if/elif/else, while, for and for ... in, break, continue, pass
+- Functions: def, return, default args, *args, **kwargs, keyword args
+- Lambdas, decorators, super() calls
+- List/dict/set comprehensions and generator expressions
+- Indexing and slicing (a[0], a[1:3]), attribute access, and method calls
+- Exceptions: try/except/else/finally, raise, assert
+- Imports: import and from ... import ...
+- F-strings (parsed and emitted as AST nodes)
+
+## Running locally
 
 ### Prerequisites
 
 - Python 3.10+
-- `pip`
+- pip
 
-### Installation
+### Install
 
 ```bash
-git clone https://github.com/seratul03/python_compiler
-cd compiler
-pip install flask
+pip install flask requests python-dotenv
 ```
 
-### Running
+### Configure (optional)
+
+Create a .env file if you want AI mode:
+
+```
+GROQ_API_KEY=your_key_here
+GROQ_MODEL=llama-3.3-70b-versatile
+```
+
+### Run
 
 ```bash
 python app.py
 ```
 
-Open your browser and go to `http://localhost:5000`.
+Open http://localhost:5000.
 
----
+## Security notes
 
-## Usage
+Execution safety is intentionally minimal and meant for local, trusted use:
 
-1. Write code in the editor on the left.
-2. Click **Run Code** or press **Ctrl + Enter**.
-3. Use the tabs on the right to inspect results:
+- The async runner executes user code in a subprocess with only a small pattern check.
+- safe_exec falls back to a permissive builtins map to keep the IDE usable.
+- Treat this as a learning tool, not a hardened sandbox.
 
-| Tab | Contents |
-|-----|----------|
-| **Output** | Standard output from the program |
-| **AST** | Color-coded, collapsible Abstract Syntax Tree |
-| **CFG** | Control Flow Graph — nodes and edges |
-| **Bytecode** | Disassembled stack machine instructions |
-
-4. If your program calls `input()`, an inline input bar appears automatically.
-5. Click **Reset** to clear the editor and all output tabs.
-
----
-
-## Language Reference
-
-The language is a subset of Python. Supported constructs:
-
-### Types & Literals
-
-| Type | Examples |
-|------|---------|
-| Integer | `42`, `-7` |
-| Float | `3.14`, `-0.5` |
-| String | `"hello"`, `'world'` |
-| Boolean | `True`, `False` |
-| None | `None` |
-
-### Operators
-
-| Category | Operators |
-|----------|-----------|
-| Arithmetic | `+`, `-`, `*`, `/`, `%`, `**` |
-| Comparison | `==`, `!=`, `<`, `>`, `<=`, `>=` |
-| Boolean | `and`, `or`, `not` |
-| Membership | `in`, `is` |
-| Assignment | `=`, `+=`, `-=`, `*=`, `/=`, `%=`, `**=` |
-
-### Constructs
-
-| Feature | Example |
-|---------|---------|
-| Variables & assignment | `x = 42` |
-| Augmented assignment | `x += 1` |
-| Conditionals | `if / elif / else` |
-| While loops | `while x > 0:` |
-| For loops | `for i in range(10):` |
-| Break & continue | `break`, `continue` |
-| Pass | `pass` |
-| Functions | `def greet(name):` |
-| Return | `return value` |
-| Classes & inheritance | `class Dog(Animal):` |
-| `super()` | `super().method()` |
-| `__str__` | `def __str__(self):` |
-| List literals | `[1, 2, 3]` |
-| Index access / assignment | `arr[0]`, `arr[i] = x` |
-| Augmented index assignment | `arr[i] += 1` |
-| Augmented attribute assignment | `obj.x += 1` |
-| List comprehensions | `[x * 2 for x in items]` |
-| String & list methods | `.append()`, `.upper()`, etc. |
-| Comments | `# this is a comment` |
-
-### Built-in Functions
-
-| Category | Functions |
-|----------|-----------|
-| I/O | `print()`, `input()` |
-| Type conversion | `int()`, `float()`, `str()`, `bool()` |
-| Collections | `list()`, `tuple()`, `dict()`, `set()` |
-| Iteration | `range()`, `enumerate()`, `zip()`, `map()`, `filter()`, `reversed()`, `sorted()` |
-| Math | `abs()`, `round()`, `sum()`, `min()`, `max()` |
-| Utilities | `len()`, `type()`, `isinstance()`, `hasattr()`, `getattr()`, `setattr()` |
-
----
-
-## API Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/` | Serve the web IDE |
-| `POST` | `/run` | Compile and run code; returns output + debug info (AST, CFG, bytecode) |
-| `POST` | `/start` | Start an async process; returns PID + initial debug info |
-| `GET` | `/output/<pid>` | Poll stdout of a running process; returns output + `finished` flag |
-| `POST` | `/input/<pid>` | Send a line of input to a running process |
-| `POST` | `/stop/<pid>` | Kill a running process and clean up temp files |
-
----
-
-## JIT Compiler
-
-PyFlux includes a threshold-based Just-In-Time compiler that speeds up frequently called functions by translating them to native CPython code at runtime.
-
-### How it works
-
-1. The VM tracks how many times each user-defined function is called.
-2. Once a function reaches the **call threshold (default: 10)**, its stored `FunctionDef` AST node is handed to `PythonCodeGen`.
-3. `PythonCodeGen` walks the AST and emits valid Python source code for the function.
-4. Python's built-in `compile()` + `exec()` turn that source into a real callable.
-5. The callable is **cached** in the JIT's internal cache. All future calls to that function bypass the VM's interpreter dispatch loop entirely and run at CPython native speed.
-6. If transpilation or execution ever fails, the VM **falls back to interpretation transparently** — the function is marked so JIT is never retried for it.
-
-### Supported constructs in JIT-compiled functions
-
-| Construct | JIT Support |
-|-----------|-------------|
-| Variables, augmented assignment | Yes |
-| Arithmetic, comparison, boolean ops | Yes |
-| `if / else` | Yes |
-| `while` loops | Yes |
-| `for ... in` loops | Yes |
-| `break`, `continue` | Yes |
-| `return` | Yes |
-| `print()` (routed via `__jit_print__`) | Yes |
-| Built-in calls (`len`, `range`, `int`, `str`, …) | Yes |
-| List literals, index access | Yes |
-| Attribute access & method calls | Yes |
-| List comprehensions | Yes |
-| Class instantiation, `super()` | Yes |
-
-### JIT stats
-
-`JITCompiler` exposes a `stats` dictionary after execution:
-
-```python
-jit.stats = {
-    "compiled": ["fib", "factorial"],   
-    "failed":   ["my_class_method"],    
-    "counts":   {"fib": 12, ...}        
-}
-```
-
----
-
-## Security
-
-Code is executed in a sandboxed subprocess with:
-
-- **Forbidden patterns** — `import os`, `import sys`, `import subprocess`, `__import__`, `open(`, `eval(`, `exec(` are blocked before execution
-- **Restricted built-ins** — only a safe whitelist is available inside the sandbox (`print`, `input`, `len`, `range`, `int`, `float`, `str`, `bool`, `list`, `dict`, `set`, `tuple`, `sum`, `min`, `max`, `enumerate`)
-- **Process isolation** — each run gets a unique UUID and a temporary directory that is cleaned up on exit
-- **Thread-safe I/O** — output is buffered via background threads to prevent blocking
-
----
-
-## Project Structure
+## Project structure
 
 ```
+app.py                  # Flask server and API routes
+ai/
+   ai_checker.py         # Groq pre/post checks
+   groq_client.py        # Groq API client
 compiler/
-├── lexer.py              # Tokenizer
-├── parser.py             # AST builder
-├── ast_nodes.py          # 42+ AST node definitions
-├── semantic.py           # Scope & variable validation
-├── semantic_analyzer.py  # Visitor-based semantic checks
-├── optimizer.py          # AST-level optimizations
-├── ir.py                 # Intermediate representation
-├── ir_to_bytecode.py     # IR → bytecode converter
-├── bytecode.py           # Bytecode instruction emitter
-├── disassembler.py       # Human-readable bytecode output
-├── vm.py                 # Stack-based virtual machine
-├── jit.py                # Threshold-based JIT compiler (PythonCodeGen + JITCompiler)
-├── cfg.py                # Control flow graph builder
-├── ast_visualizer.py     # AST → JSON for UI rendering
+   lexer.py              # Tokenizer
+   parser.py             # AST builder
+   ast_nodes.py          # AST node definitions
+   semantic.py           # Semantic checks (scopes, loop rules)
+   semantic_analyzer.py  # Legacy semantic pass (unused)
+   optimizer.py          # AST-level optimizations
+   ir.py                 # Intermediate representation (IR)
+   ir_to_bytecode.py     # IR -> bytecode converter
+   bytecode.py           # Bytecode emitter
+   disassembler.py       # Bytecode disassembler
+   vm.py                 # Stack-based VM
+   jit.py                # JIT compiler
+   cfg.py                # Control flow graph builder
+   ast_visualizer.py     # AST -> text/JSON
 execution/
-├── runner.py             # Compiler orchestration + process management
-├── sandbox.py            # Safe execution environment
-templates/
-└── index.html            # Web IDE (Monaco Editor)
+   runner.py             # Compiler orchestration and async process handling
+   sandbox.py            # Placeholder (unused)
 static/
-├── style.css             # UI styles
-└── script.js             # Frontend logic
-app.py                    # Flask server & API routes
+   script.js             # Frontend logic
+   style.css             # UI styles
+templates/
+   index.html            # Web IDE
 ```
-
----
-
-## Dependencies
-
-| Package | Purpose |
-|---------|---------|
-| `Flask` | Web server and REST API |
-| `Monaco Editor` (CDN) | Browser-based code editor |
-| `subprocess`, `threading`, `uuid`, `tempfile` | Sandboxed async process execution (stdlib only) |
