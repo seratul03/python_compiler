@@ -9,10 +9,14 @@ const aiPendingBadgeEl = document.getElementById("ai-pending-badge");
 const filenameInputEl = document.getElementById("filename-input");
 const aiUserInputEl = document.getElementById("ai-user-input");
 const aiSendBtnEl = document.getElementById("ai-send-btn");
+const runStatusEl = document.getElementById("run-status");
 
 const DEFAULT_FILENAME_BASE = "main";
 const FILENAME_STORAGE_KEY = "pyflux-filename";
 const INPUT_MARKER = "__PYFLUX_INPUT__";
+const IMAGE_MARKER = "__PYFLUX_IMAGE__:";
+const IMAGE_ERROR_MARKER = "__PYFLUX_IMAGE_ERROR__:";
+const RUN_STALL_MS = 4500;
 
 let aiPrecheckShown = false;
 let aiPostcheckShown = false;
@@ -505,10 +509,34 @@ function isAiModeEnabled() {
   return Boolean(aiToggleEl && aiToggleEl.checked);
 }
 
+function setRunStatus(state, label) {
+  if (!runStatusEl) return;
+  runStatusEl.dataset.state = state;
+  if (label) {
+    runStatusEl.textContent = label;
+    return;
+  }
+  const labels = {
+    idle: "Idle",
+    running: "Running",
+    waiting: "Waiting for input",
+    stalled: "Stalled",
+    stopped: "Stopped",
+    error: "Error",
+  };
+  runStatusEl.textContent = labels[state] || "Idle";
+}
+
+setRunStatus("idle");
+
 let currentPid = null;
 let pollTimer = null;
 let isWaitingForInput = false;
 let sessionOutput = "";
+let pendingOutputChunk = "";
+let outputTextEl = null;
+let outputMediaEl = null;
+let lastOutputAt = 0;
 
 const _buildingTimers = {};
 
@@ -569,20 +597,85 @@ function switchTab(tab) {
   });
 }
 
-function stripInputMarkers(text) {
-  if (!text) return { text: "", sawMarker: false };
-  let sawMarker = false;
-  const regex = new RegExp(INPUT_MARKER + "\\r?\\n?", "g");
-  const cleaned = text.replace(regex, () => {
-    sawMarker = true;
-    return "";
+function ensureOutputLayout() {
+  if (!outputBoxEl) return;
+  if (!outputTextEl) {
+    outputBoxEl.innerHTML = "";
+    outputTextEl = document.createElement("pre");
+    outputTextEl.className = "output-text";
+    outputMediaEl = document.createElement("div");
+    outputMediaEl.className = "output-media";
+    outputBoxEl.appendChild(outputTextEl);
+    outputBoxEl.appendChild(outputMediaEl);
+  }
+}
+
+function setOutputText(text) {
+  ensureOutputLayout();
+  if (!outputTextEl) return;
+  outputTextEl.textContent = text;
+}
+
+function clearOutputMedia() {
+  ensureOutputLayout();
+  if (outputMediaEl) outputMediaEl.innerHTML = "";
+}
+
+function addOutputImage(base64) {
+  if (!base64) return;
+  ensureOutputLayout();
+  if (!outputMediaEl) return;
+  const img = document.createElement("img");
+  img.className = "output-image";
+  img.alt = "Plot";
+  img.src = "data:image/png;base64," + base64;
+  outputMediaEl.appendChild(img);
+}
+
+function processOutputChunk(chunk, isFinal = false) {
+  if (!chunk && !isFinal) {
+    return { text: "", sawInput: false, images: [], imageErrors: [] };
+  }
+
+  const merged = pendingOutputChunk + (chunk || "");
+  const lines = merged.split(/\r?\n/);
+  pendingOutputChunk = lines.pop();
+
+  let finalTail = null;
+  if (isFinal && pendingOutputChunk) {
+    finalTail = pendingOutputChunk;
+    lines.push(finalTail);
+    pendingOutputChunk = "";
+  }
+
+  let sawInput = false;
+  const images = [];
+  const imageErrors = [];
+  let text = "";
+
+  const lastIndex = lines.length - 1;
+  lines.forEach((line, idx) => {
+    if (line === INPUT_MARKER) {
+      sawInput = true;
+      return;
+    }
+    if (line.startsWith(IMAGE_MARKER)) {
+      images.push(line.slice(IMAGE_MARKER.length));
+      return;
+    }
+    if (line.startsWith(IMAGE_ERROR_MARKER)) {
+      imageErrors.push(line.slice(IMAGE_ERROR_MARKER.length));
+      return;
+    }
+    const noNewline = isFinal && finalTail !== null && idx === lastIndex;
+    text += line + (noNewline ? "" : "\n");
   });
-  return { text: cleaned, sawMarker };
+
+  return { text, sawInput, images, imageErrors };
 }
 
 function runCode() {
   const code = editor.getValue();
-  const outputBox = outputBoxEl;
 
   stopSession();
   clearAiReviewEntries();
@@ -591,8 +684,13 @@ function runCode() {
   aiHasError = false;
   lastRuntimeError = "";
 
-  outputBox.innerText = "Running...";
+  ensureOutputLayout();
+  clearOutputMedia();
+  pendingOutputChunk = "";
+  lastOutputAt = Date.now();
+  setOutputText("Running...");
   setOutputStatus("normal");
+  setRunStatus("running");
   sessionOutput = "";
 
   showBuildingAnimation("ast", "AST");
@@ -609,18 +707,20 @@ function runCode() {
       if (data.error) {
         stopAllBuildingAnimations();
         lastRuntimeError = formatErrorText(data.error);
-        outputBox.innerText =
+        setOutputText(
           typeof data.error === "object"
             ? data.error.type + ":\n" + data.error.message
-            : data.error;
+            : data.error,
+        );
         setOutputStatus("error");
+        setRunStatus("error");
         return;
       }
 
       currentPid = data.pid;
       isWaitingForInput = false;
       sessionOutput = "";
-      outputBox.innerText = "";
+      setOutputText("");
 
       stopAllBuildingAnimations();
       renderASTTree(data.ast_json || null);
@@ -636,8 +736,9 @@ function runCode() {
     })
     .catch(() => {
       stopAllBuildingAnimations();
-      outputBox.innerText = "Error communicating with server.";
+      setOutputText("Error communicating with server.");
       setOutputStatus("error");
+      setRunStatus("error");
     });
 }
 
@@ -656,20 +757,30 @@ function pollOutput() {
       if (data.error) {
         stopSession();
         lastRuntimeError = formatErrorText(data.error);
-        outputBox.innerText = sessionOutput + "\n" + data.error;
+        setOutputText(sessionOutput + "\n" + data.error);
         setOutputStatus("error");
+        setRunStatus("error");
         return;
       }
 
       if (data.output) {
-        const cleaned = stripInputMarkers(data.output);
-        if (cleaned.text) {
-          sessionOutput += cleaned.text;
-          outputBox.innerText = sessionOutput;
+        const parsed = processOutputChunk(data.output, false);
+        if (parsed.text) {
+          sessionOutput += parsed.text;
+          setOutputText(sessionOutput);
           outputBox.scrollTop = outputBox.scrollHeight;
+          lastOutputAt = Date.now();
         }
-        if (cleaned.sawMarker && !isWaitingForInput) {
+        if (parsed.sawInput && !isWaitingForInput) {
           showInputRow();
+        }
+        parsed.images.forEach(addOutputImage);
+        if (parsed.imageErrors.length) {
+          parsed.imageErrors.forEach((msg) => {
+            sessionOutput += "[plot error] " + msg + "\n";
+          });
+          setOutputText(sessionOutput);
+          lastOutputAt = Date.now();
         }
       }
 
@@ -683,10 +794,38 @@ function pollOutput() {
       }
 
       if (data.finished) {
+        if (pendingOutputChunk) {
+          const parsed = processOutputChunk("", true);
+          if (parsed.text) {
+            sessionOutput += parsed.text;
+            setOutputText(sessionOutput);
+            lastOutputAt = Date.now();
+          }
+          parsed.images.forEach(addOutputImage);
+          if (parsed.imageErrors.length) {
+            parsed.imageErrors.forEach((msg) => {
+              sessionOutput += "[plot error] " + msg + "\n";
+            });
+            setOutputText(sessionOutput);
+            lastOutputAt = Date.now();
+          }
+        }
         stopSession();
         setOutputStatus("normal");
+        if (data.runtime_error) {
+          setRunStatus("error");
+        } else {
+          setRunStatus("stopped");
+        }
         if (!sessionOutput) {
-          outputBox.innerText = "(no output)";
+          setOutputText("(no output)");
+        }
+      } else if (!isWaitingForInput) {
+        const now = Date.now();
+        if (now - lastOutputAt >= RUN_STALL_MS) {
+          setRunStatus("stalled");
+        } else {
+          setRunStatus("running");
         }
       }
     })
@@ -698,12 +837,16 @@ function showInputRow() {
   const row = document.getElementById("input-row");
   row.style.display = "flex";
   document.getElementById("user-input-field").focus();
+  setRunStatus("waiting");
 }
 
 function hideInputRow() {
   const row = document.getElementById("input-row");
   row.style.display = "none";
   document.getElementById("user-input-field").value = "";
+  if (currentPid) {
+    setRunStatus("running");
+  }
 }
 
 function submitInput() {
@@ -713,7 +856,7 @@ function submitInput() {
   const value = inputField.value;
 
   sessionOutput += value + "\n";
-  outputBoxEl.innerText = sessionOutput;
+  setOutputText(sessionOutput);
 
   hideInputRow();
   isWaitingForInput = false;
@@ -747,11 +890,11 @@ function resetCompiler() {
   aiPostcheckShown = false;
   aiHasError = false;
   lastRuntimeError = "";
+  setRunStatus("idle");
 
-  const outputBox = outputBoxEl;
-  outputBox.innerText = "";
+  setOutputText("");
   setOutputStatus("normal");
-  outputBox.contentEditable = "false";
+  outputBoxEl.contentEditable = "false";
 
   document.getElementById("ast").innerHTML = "";
   document.getElementById("cfg").innerText = "";

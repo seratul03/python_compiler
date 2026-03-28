@@ -230,6 +230,49 @@ body {
   background: white;
 }
 
+.run-status {
+  margin-left: auto;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #0f172a;
+  background: #f8fafc;
+}
+
+.run-status[data-state="running"] {
+  color: #0f172a;
+  background: #dbeafe;
+  border-color: #bfdbfe;
+}
+
+.run-status[data-state="waiting"] {
+  color: #7c2d12;
+  background: #ffedd5;
+  border-color: #fed7aa;
+}
+
+.run-status[data-state="stalled"] {
+  color: #7f1d1d;
+  background: #fee2e2;
+  border-color: #fecaca;
+}
+
+.run-status[data-state="stopped"] {
+  color: #14532d;
+  background: #dcfce7;
+  border-color: #bbf7d0;
+}
+
+.run-status[data-state="error"] {
+  color: #7f1d1d;
+  background: #fee2e2;
+  border-color: #fecaca;
+}
+
 .tab-btn {
   padding: 7px 12px;
 
@@ -291,6 +334,26 @@ body {
 
 .tab-content.active {
   display: block;
+}
+
+.output-text {
+  margin: 0;
+  white-space: pre-wrap;
+  font-family: "Fira Code", monospace;
+  font-size: 13px;
+}
+
+.output-media {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.output-image {
+  max-width: 100%;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
 }
 
 #input-row {
@@ -894,6 +957,42 @@ body[data-theme="dark"] .editor-pane {
 body[data-theme="dark"] .tab-bar {
   background: #0a1828;
   border-bottom-color: var(--border-color);
+}
+
+body[data-theme="dark"] .run-status {
+  color: #e2e8f0;
+  background: #0f172a;
+  border-color: #1f2a44;
+}
+
+body[data-theme="dark"] .run-status[data-state="running"] {
+  color: #e2e8f0;
+  background: #1e3a8a;
+  border-color: #1d4ed8;
+}
+
+body[data-theme="dark"] .run-status[data-state="waiting"] {
+  color: #fef3c7;
+  background: #7c2d12;
+  border-color: #b45309;
+}
+
+body[data-theme="dark"] .run-status[data-state="stalled"] {
+  color: #fecaca;
+  background: #7f1d1d;
+  border-color: #991b1b;
+}
+
+body[data-theme="dark"] .run-status[data-state="stopped"] {
+  color: #bbf7d0;
+  background: #14532d;
+  border-color: #166534;
+}
+
+body[data-theme="dark"] .run-status[data-state="error"] {
+  color: #fecaca;
+  background: #7f1d1d;
+  border-color: #991b1b;
 }
 
 body[data-theme="dark"] .tab-btn {

@@ -145,13 +145,19 @@ SAFE_BUILTINS = {
 }
 
 INPUT_MARKER = "__PYFLUX_INPUT__"
+IMAGE_MARKER = "__PYFLUX_IMAGE__"
+IMAGE_ERROR_MARKER = "__PYFLUX_IMAGE_ERROR__"
 INPUT_BOOTSTRAP = textwrap.dedent(
     f"""\
 import builtins as __builtins__
 import sys as __sys__
 
 __pyflux_input_marker = {INPUT_MARKER!r}
+__pyflux_image_marker = {IMAGE_MARKER!r} + ":"
+__pyflux_image_error_marker = {IMAGE_ERROR_MARKER!r} + ":"
 __pyflux_original_input = __builtins__.input
+__pyflux_original_import = __builtins__.__import__
+__pyflux_patching = False
 
 def __pyflux_input(prompt=""):
     if prompt:
@@ -161,7 +167,54 @@ def __pyflux_input(prompt=""):
     __sys__.stdout.flush()
     return __pyflux_original_input()
 
+def __pyflux_patch_matplotlib():
+    global __pyflux_patching
+    if __pyflux_patching:
+        return
+    __pyflux_patching = True
+    try:
+        import matplotlib.pyplot as __plt__
+    except Exception:
+        __pyflux_patching = False
+        return
+    try:
+        if getattr(__plt__, "__pyflux_patched__", False):
+            return
+
+        def __pyflux_show(*args, **kwargs):
+            try:
+                import io as __io__
+                import base64 as __base64__
+                buf = __io__.BytesIO()
+                __plt__.savefig(buf, format="png", bbox_inches="tight")
+                buf.seek(0)
+                payload = __base64__.b64encode(buf.read()).decode("ascii")
+                __sys__.stdout.write(__pyflux_image_marker + payload + "\\n")
+                __sys__.stdout.flush()
+            except Exception as __e:
+                __sys__.stdout.write(
+                    __pyflux_image_error_marker + str(__e) + "\\n"
+                )
+                __sys__.stdout.flush()
+            finally:
+                try:
+                    __plt__.close("all")
+                except Exception:
+                    pass
+
+        __plt__.show = __pyflux_show
+        __plt__.__pyflux_patched__ = True
+    finally:
+        __pyflux_patching = False
+
+def __pyflux_import(name, globals=None, locals=None, fromlist=(), level=0):
+    mod = __pyflux_original_import(name, globals, locals, fromlist, level)
+    if isinstance(name, str) and name.startswith("matplotlib"):
+        __pyflux_patch_matplotlib()
+    return mod
+
 __builtins__.input = __pyflux_input
+__builtins__.__import__ = __pyflux_import
 """
 )
 
