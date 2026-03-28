@@ -1002,27 +1002,153 @@ function renderASTTree(astData) {
 
 const menu = document.getElementById("editor-menu");
 const editorEl = document.getElementById("editor");
+let editorMenuSelection = null;
 
 editorEl.addEventListener("contextmenu", function (e) {
   e.preventDefault();
+
+  if (window.editor && editor.getSelection) {
+    editorMenuSelection = editor.getSelection();
+  }
 
   menu.style.display = "block";
   menu.style.left = e.pageX + "px";
   menu.style.top = e.pageY + "px";
 });
 
+menu.addEventListener("mousedown", function (e) {
+  // Keep Monaco selection intact while clicking custom menu actions.
+  e.preventDefault();
+});
+
 document.addEventListener("click", function () {
   menu.style.display = "none";
 });
 
-function menuCut() {
-  document.execCommand("cut");
+async function menuCut() {
+  let handled = await runEditorClipboardAction("editor.action.clipboardCutAction");
+  if (!handled) {
+    handled = await runBrowserClipboardFallback("cut");
+  }
+  if (!handled) {
+    document.execCommand("cut");
+  }
+  menu.style.display = "none";
 }
 
-function menuCopy() {
-  document.execCommand("copy");
+async function menuCopy() {
+  let handled = await runEditorClipboardAction("editor.action.clipboardCopyAction");
+  if (!handled) {
+    handled = await runBrowserClipboardFallback("copy");
+  }
+  if (!handled) {
+    document.execCommand("copy");
+  }
+  menu.style.display = "none";
 }
 
-function menuPaste() {
-  document.execCommand("paste");
+async function menuPaste() {
+  let handled = await runEditorClipboardAction("editor.action.clipboardPasteAction");
+  if (!handled) {
+    handled = await runBrowserClipboardFallback("paste");
+  }
+  if (!handled) {
+    document.execCommand("paste");
+  }
+  menu.style.display = "none";
+}
+
+function menuSelectAll() {
+  if (!window.editor) {
+    menu.style.display = "none";
+    return;
+  }
+
+  editor.focus();
+
+  const model = editor.getModel && editor.getModel();
+  if (model && editor.setSelection && monaco && monaco.Range) {
+    const lastLine = model.getLineCount();
+    const lastColumn = model.getLineMaxColumn(lastLine);
+    editor.setSelection(new monaco.Range(1, 1, lastLine, lastColumn));
+  } else {
+    runEditorClipboardAction("editor.action.selectAll");
+  }
+
+  if (editor.getSelection) {
+    editorMenuSelection = editor.getSelection();
+  }
+  menu.style.display = "none";
+}
+
+function restoreEditorMenuSelection() {
+  if (!window.editor || !editorMenuSelection || !editor.setSelection) return;
+  editor.setSelection(editorMenuSelection);
+}
+
+async function runEditorClipboardAction(actionId) {
+  if (!window.editor || !actionId) return false;
+
+  editor.focus();
+  restoreEditorMenuSelection();
+
+  const action = editor.getAction && editor.getAction(actionId);
+  if (action && typeof action.run === "function") {
+    try {
+      await action.run();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  return false;
+}
+
+async function runBrowserClipboardFallback(mode) {
+  if (!window.editor) return false;
+
+  editor.focus();
+  restoreEditorMenuSelection();
+
+  const selection = editor.getSelection && editor.getSelection();
+  const model = editor.getModel && editor.getModel();
+  if (!selection || !model) return false;
+
+  if (mode === "copy" || mode === "cut") {
+    const selectedText = model.getValueInRange(selection);
+    if (!selectedText) return false;
+
+    if (!navigator.clipboard || !navigator.clipboard.writeText) return false;
+
+    try {
+      await navigator.clipboard.writeText(selectedText);
+      if (mode === "cut") {
+        editor.executeEdits("editor-menu", [
+          { range: selection, text: "", forceMoveMarkers: true },
+        ]);
+      }
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  if (mode === "paste") {
+    if (!navigator.clipboard || !navigator.clipboard.readText) return false;
+
+    try {
+      const text = await navigator.clipboard.readText();
+      if (typeof text !== "string") return false;
+
+      editor.executeEdits("editor-menu", [
+        { range: selection, text: text, forceMoveMarkers: true },
+      ]);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  return false;
 }
