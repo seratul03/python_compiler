@@ -656,8 +656,14 @@ function processOutputChunk(chunk, isFinal = false) {
 
   const lastIndex = lines.length - 1;
   lines.forEach((line, idx) => {
-    if (line === INPUT_MARKER) {
+    const noNewline = isFinal && finalTail !== null && idx === lastIndex;
+    const inputIndex = line.indexOf(INPUT_MARKER);
+    if (inputIndex !== -1) {
       sawInput = true;
+      const cleaned = line.replace(INPUT_MARKER, "");
+      if (cleaned) {
+        text += cleaned;
+      }
       return;
     }
     if (line.startsWith(IMAGE_MARKER)) {
@@ -668,7 +674,6 @@ function processOutputChunk(chunk, isFinal = false) {
       imageErrors.push(line.slice(IMAGE_ERROR_MARKER.length));
       return;
     }
-    const noNewline = isFinal && finalTail !== null && idx === lastIndex;
     text += line + (noNewline ? "" : "\n");
   });
 
@@ -858,7 +863,7 @@ function submitInput() {
   const inputField = document.getElementById("user-input-field");
   const value = inputField.value;
 
-  sessionOutput += value + "\n";
+  sessionOutput += "\n";
   setOutputText(sessionOutput);
 
   hideInputRow();

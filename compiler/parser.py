@@ -626,26 +626,38 @@ class Parser:
             f"{self.current().type if self.current() else 'EOF'}"
         )
 
-    def _parse_subscript_index(self):
-        """Parse the content between [ and ] including possible slices."""
-        if self.current() and self.current().type == "COLON":
-            start = None
-        else:
+    def _parse_subscript_item(self):
+        """Parse one subscript item: expr or start:stop:step."""
+        start = None
+        if self.current() and self.current().type != "COLON":
             start = self.bool_expr()
+
         if self.current() and self.current().type == "COLON":
             self.eat("COLON")
             stop = None
-            if self.current() and self.current().type not in ("RBRACKET", "COLON"):
+            if self.current() and self.current().type not in ("RBRACKET", "COMMA", "COLON"):
                 stop = self.bool_expr()
             step = None
             if self.current() and self.current().type == "COLON":
                 self.eat("COLON")
-                if self.current() and self.current().type != "RBRACKET":
+                if self.current() and self.current().type not in ("RBRACKET", "COMMA"):
                     step = self.bool_expr()
-            self.eat("RBRACKET")
             return Slice(start, stop, step)
-        self.eat("RBRACKET")
+
         return start
+
+    def _parse_subscript_index(self):
+        """Parse [item] or multidimensional [item1, item2, ...]."""
+        items = [self._parse_subscript_item()]
+        while self.current() and self.current().type == "COMMA":
+            self.eat("COMMA")
+            if self.current() and self.current().type == "RBRACKET":
+                break
+            items.append(self._parse_subscript_item())
+        self.eat("RBRACKET")
+        if len(items) == 1:
+            return items[0]
+        return TupleLiteral(items)
 
     def block(self):
         statements = []
@@ -661,7 +673,7 @@ class Parser:
 
 
     def bool_expr(self):
-        """or / and / ternary — top-level expression."""
+        """or / and / ternary - top-level expression."""
         left = self._and_expr()
         while self.current() and self.current().type == "OR":
             self.eat("OR")
@@ -804,30 +816,8 @@ class Parser:
         return node
 
     def _parse_subscript(self, obj_node):
-        """Parse [index] or [start:stop:step] after an expression."""
-        start = None
-        stop = None
-        step = None
-
-        if self.current() and self.current().type == "COLON":
-            pass
-        else:
-            start = self.bool_expr()
-
-        if self.current() and self.current().type == "COLON":
-            self.eat("COLON")
-            if self.current() and self.current().type not in ("RBRACKET", "COLON"):
-                stop = self.bool_expr()
-            if self.current() and self.current().type == "COLON":
-                self.eat("COLON")
-                if self.current() and self.current().type != "RBRACKET":
-                    step = self.bool_expr()
-            self.eat("RBRACKET")
-            index = Slice(start, stop, step)
-        else:
-            index = start
-            self.eat("RBRACKET")
-
+        """Parse [index], [slice], or multidimensional forms like [:, 0]."""
+        index = self._parse_subscript_index()
         if isinstance(obj_node, Variable):
             return ListAccess(obj_node.name, index)
         return ExprSubscript(obj_node, index)

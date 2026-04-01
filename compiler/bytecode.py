@@ -367,6 +367,7 @@ class BytecodeGenerator:
             self.generate(s.value)
             self.instructions.append(Instruction("UNPACK_STARRED"))
         for a in dstar_parts:
+            self.instructions.append(Instruction("LOAD_CONST", None))
             self.generate(a.value)
         for kw in kw_parts:
             self.instructions.append(Instruction("LOAD_CONST", kw.name))
@@ -374,6 +375,38 @@ class BytecodeGenerator:
         n_kw = len(kw_parts) + len(dstar_parts)
         self.instructions.append(
             Instruction("CALL_FUNCTION_KW", (name, len(pos_parts) + len(star_parts), n_kw))
+        )
+
+    def _emit_method_call_ex(self, method_name, args):
+        """Emit a method call that may contain keyword/starred args."""
+        pos_parts = []
+        kw_parts = []
+        star_parts = []
+        dstar_parts = []
+        for a in args:
+            t = type(a).__name__
+            if t == "KeywordArg":
+                kw_parts.append(a)
+            elif t == "Starred":
+                star_parts.append(a)
+            elif t == "DoubleStarred":
+                dstar_parts.append(a)
+            else:
+                pos_parts.append(a)
+        for a in pos_parts:
+            self.generate(a)
+        for s in star_parts:
+            self.generate(s.value)
+            self.instructions.append(Instruction("UNPACK_STARRED"))
+        for a in dstar_parts:
+            self.instructions.append(Instruction("LOAD_CONST", None))
+            self.generate(a.value)
+        for kw in kw_parts:
+            self.instructions.append(Instruction("LOAD_CONST", kw.name))
+            self.generate(kw.value)
+        n_kw = len(kw_parts) + len(dstar_parts)
+        self.instructions.append(
+            Instruction("CALL_METHOD_KW", (method_name, len(pos_parts) + len(star_parts), n_kw))
         )
 
     def visit_FStringExpr(self, node):
@@ -468,11 +501,18 @@ class BytecodeGenerator:
 
     def visit_MethodCall(self, node):
         self.instructions.append(Instruction("LOAD_VAR", node.obj))
-        for arg in node.args:
-            self.generate(arg)
-        self.instructions.append(
-            Instruction("CALL_METHOD", (node.method, len(node.args)))
+        has_special = any(
+            type(a).__name__ in ("KeywordArg", "Starred", "DoubleStarred")
+            for a in node.args
         )
+        if has_special:
+            self._emit_method_call_ex(node.method, node.args)
+        else:
+            for arg in node.args:
+                self.generate(arg)
+            self.instructions.append(
+                Instruction("CALL_METHOD", (node.method, len(node.args)))
+            )
 
     def visit_SuperMethodCall(self, node):
         for arg in node.args:
@@ -483,11 +523,18 @@ class BytecodeGenerator:
 
     def visit_MethodCallExpr(self, node):
         self.generate(node.obj_expr)   
-        for arg in node.args:
-            self.generate(arg)
-        self.instructions.append(
-            Instruction("CALL_METHOD", (node.method, len(node.args)))
+        has_special = any(
+            type(a).__name__ in ("KeywordArg", "Starred", "DoubleStarred")
+            for a in node.args
         )
+        if has_special:
+            self._emit_method_call_ex(node.method, node.args)
+        else:
+            for arg in node.args:
+                self.generate(arg)
+            self.instructions.append(
+                Instruction("CALL_METHOD", (node.method, len(node.args)))
+            )
 
     def visit_AttributeAccessExpr(self, node):
         self.generate(node.obj_expr)

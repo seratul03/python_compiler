@@ -179,15 +179,30 @@ class VirtualMachine:
         result = sub_vm.stack[-1] if sub_vm.stack else ""
         return str(result)
 
-    def _call_method_node(self, method_node, obj, args, ip, class_name=None):
+    def _call_method_node(self, method_node, obj, args, ip, class_name=None, kwargs=None):
         method_instructions = self._compile_body(method_node.body)
         new_frame = Frame()
         new_frame.variables["self"] = obj
         new_frame.variables["__current_class__"] = (
             class_name if class_name is not None else obj.get("__class__", "")
         )
-        for param, val in zip(method_node.params[1:], args):
+        kwargs = kwargs or {}
+        params = method_node.params[1:]
+        for param, val in zip(params, args):
             new_frame.variables[param] = val
+        for param in params[len(args):]:
+            if param in kwargs:
+                new_frame.variables[param] = kwargs[param]
+        kwarg_name = getattr(method_node, "kwarg", None)
+        if kwarg_name:
+            extra_kwargs = {k: v for k, v in kwargs.items() if k not in params}
+            new_frame.variables[kwarg_name] = extra_kwargs
+        else:
+            unexpected = [k for k in kwargs if k not in params]
+            if unexpected:
+                raise TypeError(
+                    f"{method_node.name}() got unexpected keyword argument '{unexpected[0]}'"
+                )
         self.frames.append(new_frame)
         self.call_stack.append((self.instructions, ip + 1))
         self.instructions = method_instructions
@@ -451,6 +466,70 @@ class VirtualMachine:
                         f"Class '{obj['__class__']}' has no method '{method_name}'"
                     )
                 ip = self._call_method_node(method_node, obj, args, ip, class_name=found_class)
+                ip = 0
+                continue
+
+            elif op == "CALL_METHOD_KW":
+                method_name, pos_count, kw_count = instr.argument
+                kw_values = [self.stack.pop() for _ in range(kw_count)]
+                kw_keys = [self.stack.pop() for _ in range(kw_count)]
+                args = [self.stack.pop() for _ in range(pos_count)]
+                kw_values.reverse()
+                kw_keys.reverse()
+                args.reverse()
+                kwargs = {}
+                for key, value in zip(kw_keys, kw_values):
+                    if key is None:
+                        if not isinstance(value, dict):
+                            raise TypeError("** argument must be a mapping")
+                        kwargs.update(value)
+                    else:
+                        kwargs[key] = value
+
+                obj = self.stack.pop()
+
+                if isinstance(obj, str):
+                    m = getattr(str, method_name, None)
+                    if m is None:
+                        raise AttributeError(f"str has no method '{method_name}'")
+                    result = getattr(obj, method_name)(*args, **kwargs)
+                    self.stack.append(result if result is not None else obj)
+                    ip += 1
+                    continue
+
+                if isinstance(obj, list):
+                    m = getattr(list, method_name, None)
+                    if m is None:
+                        raise AttributeError(f"list has no method '{method_name}'")
+                    result = getattr(obj, method_name)(*args, **kwargs)
+                    self.stack.append(result if result is not None else None)
+                    ip += 1
+                    continue
+
+                if not (isinstance(obj, dict) and "__class__" in obj):
+                    method = getattr(obj, method_name, None)
+                    if method is None:
+                        raise AttributeError(
+                            f"'{type(obj).__name__}' has no attribute '{method_name}'"
+                        )
+                    result = method(*args, **kwargs)
+                    self.stack.append(result)
+                    ip += 1
+                    continue
+
+                method_node, found_class = self._find_method(obj["__class__"], method_name)
+                if method_node is None:
+                    raise AttributeError(
+                        f"Class '{obj['__class__']}' has no method '{method_name}'"
+                    )
+                ip = self._call_method_node(
+                    method_node,
+                    obj,
+                    args,
+                    ip,
+                    class_name=found_class,
+                    kwargs=kwargs,
+                )
                 ip = 0
                 continue
             elif op == "CALL_SUPER_METHOD":
@@ -717,24 +796,36 @@ class VirtualMachine:
                 pos_args.reverse()
                 kw_keys.reverse()
                 kw_values.reverse()
-                kwargs = dict(zip(kw_keys, kw_values))
+                kwargs = {}
+                for key, value in zip(kw_keys, kw_values):
+                    if key is None:
+                        if not isinstance(value, dict):
+                            raise TypeError("** argument must be a mapping")
+                        kwargs.update(value)
+                    else:
+                        kwargs[key] = value
                 all_args = pos_args
                 if name in self.functions:
                     func = self.functions[name]
                     params = func["params"]
+                    func_node = func.get("node")
                     new_frame = Frame()
                     for i, (param, val) in enumerate(zip(params, pos_args)):
                         new_frame.variables[param] = val
                     for param in params[len(pos_args):]:
                         if param in kwargs:
                             new_frame.variables[param] = kwargs[param]
+                    kwarg_name = getattr(func_node, "kwarg", None) if func_node else None
+                    if kwarg_name:
+                        extra_kwargs = {k: v for k, v in kwargs.items() if k not in params}
+                        new_frame.variables[kwarg_name] = extra_kwargs
                     self.frames.append(new_frame)
                     self.call_stack.append((self.instructions, ip + 1))
                     self.instructions = func["instructions"]
                     ip = 0
                     continue
                 else:
-                    ip = self._dispatch_call(name, pos_args, ip)
+                    ip = self._dispatch_call(name, pos_args, ip, kwargs=kwargs)
                     if ip == -1:
                         ip = 0
                     else:
@@ -797,7 +888,8 @@ class VirtualMachine:
             return _exc_map.get(exc_type_name, Exception)
         return Exception
 
-    def _dispatch_call(self, name, args, ip):
+    def _dispatch_call(self, name, args, ip, kwargs=None):
+        kwargs = kwargs or {}
         if name == "str":
             obj = args[0] if args else ""
             if isinstance(obj, dict) and "__class__" in obj:
@@ -814,7 +906,7 @@ class VirtualMachine:
 
         if name in ("int", "float", "bool", "abs", "round"):
             fn = _BUILTIN_CALLABLES[name]
-            self.stack.append(fn(*args))
+            self.stack.append(fn(*args, **kwargs))
             return ip
 
         if name == "len":
@@ -980,8 +1072,16 @@ class VirtualMachine:
                 new_frame   = Frame()
                 new_frame.variables["self"] = instance
                 new_frame.variables["__current_class__"] = init_class or name
-                for param, val in zip(init_node.params[1:], args):
+                init_params = init_node.params[1:]
+                for param, val in zip(init_params, args):
                     new_frame.variables[param] = val
+                for param in init_params[len(args):]:
+                    if param in kwargs:
+                        new_frame.variables[param] = kwargs[param]
+                init_kwarg = getattr(init_node, "kwarg", None)
+                if init_kwarg:
+                    extra_kwargs = {k: v for k, v in kwargs.items() if k not in init_params}
+                    new_frame.variables[init_kwarg] = extra_kwargs
                 sub_vm = VirtualMachine(init_instrs)
                 sub_vm.frames   = [new_frame]
                 sub_vm.functions = self.functions
@@ -1003,19 +1103,19 @@ class VirtualMachine:
                 break
         if callable(var_val):
             try:
-                self.stack.append(var_val(*args))
+                self.stack.append(var_val(*args, **kwargs))
             except Exception as e:
                 raise RuntimeError(f"Error calling '{name}': {e}") from e
             return ip
 
         if name in _BUILTIN_CALLABLES:
-            self.stack.append(_BUILTIN_CALLABLES[name](*args))
+            self.stack.append(_BUILTIN_CALLABLES[name](*args, **kwargs))
             return ip
 
         import builtins as _builtins_ns
         _bi = getattr(_builtins_ns, name, None)
         if callable(_bi):
-            self.stack.append(_bi(*args))
+            self.stack.append(_bi(*args, **kwargs))
             return ip
 
         raise NameError(f"Unknown function or class: '{name}'")
