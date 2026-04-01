@@ -248,6 +248,24 @@ def format_error(e):
         "formatted": f"{name}: {message}"
     }
 
+
+def render_ir(ir_instructions):
+    if not ir_instructions:
+        return ""
+    lines = []
+    for index, instr in enumerate(ir_instructions):
+        lines.append(f"{index:04d}: {instr}")
+    return "\n".join(lines)
+
+
+def generate_ir_text(ast):
+    try:
+        ir_gen = IRGenerator()
+        ir_instructions = ir_gen.generate(ast) or []
+        return render_ir(ir_instructions)
+    except Exception:
+        return ""
+
 def start_process(user_code, ai_mode=False):
 
     security_check(user_code)
@@ -307,7 +325,7 @@ def start_process(user_code, ai_mode=False):
     return pid
 
 def get_debug_info(code):
-    """Compile code and return AST/CFG/bytecode debug info without executing."""
+    """Compile code and return AST/CFG/IR/bytecode debug info without executing."""
     try:
         tokens = tokenize(code)
         parser = Parser(tokens)
@@ -330,12 +348,26 @@ def get_debug_info(code):
         cfg = cfg_builder.build(ast)
         cfg_text = cfg_builder.render(cfg)
 
+        ir_text = generate_ir_text(ast)
+
         dis = BytecodeDisassembler()
         bytecode_text = dis.disassemble(instructions)
 
-        return {"ast": ast_tree, "ast_json": ast_json_data, "cfg": cfg_text, "bytecode": bytecode_text}
+        return {
+            "ast": ast_tree,
+            "ast_json": ast_json_data,
+            "cfg": cfg_text,
+            "ir": ir_text,
+            "bytecode": bytecode_text,
+        }
     except Exception:
-        return {"ast": "", "ast_json": None, "cfg": "", "bytecode": ""}
+        return {
+            "ast": "",
+            "ast_json": None,
+            "cfg": "",
+            "ir": "",
+            "bytecode": "",
+        }
 
 
 def safe_exec(code, input_data=""):
@@ -503,12 +535,15 @@ def run_with_compiler(code, debug=False):
         cfg = cfg_builder.build(ast)
         cfg_text = cfg_builder.render(cfg)
 
+        ir_text = generate_ir_text(ast)
+
         dis = BytecodeDisassembler()
         bytecode_text = dis.disassemble(original_instructions)
 
         return {
             "ast": ast_tree,
             "cfg": cfg_text,
+            "ir": ir_text,
             "bytecode": bytecode_text,
             "output": output
         }

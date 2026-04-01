@@ -8,13 +8,33 @@ class IRInstruction:
     def __repr__(self):
         if self.op == "LABEL":
             return f"{self.arg1}:"
-        elif self.op in ("JUMP", "JUMP_IF_FALSE"):
-            return f"{self.op} {self.arg1}"
-        elif self.result:
+        if self.op == "JUMP":
+            return f"JUMP {self.arg1}"
+        if self.op == "JUMP_IF_FALSE":
+            return f"JUMP_IF_FALSE {self.arg2} {self.arg1}"
+        if self.op == "CONST":
+            return f"{self.result} = {self.arg1!r}"
+        if self.op == "ASSIGN":
+            return f"{self.result} = {self.arg1}"
+        if self.op == "PRINT":
+            return f"PRINT {self.arg1}"
+        if self.op == "RETURN":
+            return f"RETURN {self.arg1}"
+        if self.op == "CALL":
+            args = self.arg2 if isinstance(self.arg2, list) else []
+            return f"{self.result} = CALL {self.arg1}({', '.join(map(str, args))})"
+        if self.op == "LIST":
+            elems = self.arg1 if isinstance(self.arg1, list) else []
+            return f"{self.result} = LIST [{', '.join(map(str, elems))}]"
+        if self.op == "INDEX":
+            return f"{self.result} = {self.arg1}[{self.arg2}]"
+        if self.result is not None:
+            if self.arg2 is None:
+                return f"{self.result} = {self.op} {self.arg1}"
             return f"{self.result} = {self.arg1} {self.op} {self.arg2}"
-        elif self.arg1:
+        if self.arg1 is not None:
             return f"{self.op} {self.arg1}"
-        return f"{self.op}"
+        return self.op
 
 class IRGenerator:
     def __init__(self):
@@ -53,6 +73,27 @@ class IRGenerator:
         )
         return temp
 
+    def visit_Float(self, node):
+        temp = self.new_temp()
+        self.instructions.append(
+            IRInstruction("CONST", node.value, None, temp)
+        )
+        return temp
+
+    def visit_BoolLiteral(self, node):
+        temp = self.new_temp()
+        self.instructions.append(
+            IRInstruction("CONST", node.value, None, temp)
+        )
+        return temp
+
+    def visit_NoneLiteral(self, node):
+        temp = self.new_temp()
+        self.instructions.append(
+            IRInstruction("CONST", None, None, temp)
+        )
+        return temp
+
     def visit_Variable(self, node):
         return node.name
 
@@ -67,10 +108,18 @@ class IRGenerator:
         return temp
 
     def visit_Print(self, node):
-        value = self.generate(node.value)
-        self.instructions.append(
-            IRInstruction("PRINT", value)
-        )
+        values = getattr(node, "values", None)
+        if values is None:
+            values = [getattr(node, "value", None)]
+        for value_node in values:
+            value = self.generate(value_node)
+            self.instructions.append(
+                IRInstruction("PRINT", value)
+            )
+
+    def visit_ExprStatement(self, node):
+        return self.generate(node.expr)
+
     def visit_Compare(self, node):
         left = self.generate(node.left)
         right = self.generate(node.right)
@@ -102,7 +151,7 @@ class IRGenerator:
             IRInstruction("LABEL", else_label)
         )
 
-        for stmt in node.else_body:
+        for stmt in (node.else_body or []):
             self.generate(stmt)
 
         self.instructions.append(

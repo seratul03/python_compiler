@@ -1,11 +1,11 @@
 # PyFlux
 
-PyFlux is a custom Python-like compiler with a web-based IDE. It compiles source code to custom bytecode and executes it on a stack-based virtual machine. The UI includes AST, CFG, and bytecode views, plus optional AI guidance.
+PyFlux is a custom Python-like compiler with a web-based IDE. It compiles source code to custom bytecode and executes it on a stack-based virtual machine. The UI includes AST, CFG, IR, and bytecode views, plus optional AI guidance.
 
 ## Features
 
 - Full compilation pipeline: lexer, parser, semantic analyzer, optimizer, bytecode generator, VM
-- Debug panels for AST, CFG, and bytecode
+- Debug panels for AST, CFG, IR, and bytecode
 - Interactive run mode with stdin support
 - Optional AI precheck, post-run review, and chat
 

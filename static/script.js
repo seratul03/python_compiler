@@ -576,6 +576,7 @@ function stopBuildingAnimation(sectionId) {
 function stopAllBuildingAnimations() {
   stopBuildingAnimation("ast");
   stopBuildingAnimation("cfg");
+  stopBuildingAnimation("ir");
   stopBuildingAnimation("bytecode");
 }
 
@@ -695,6 +696,7 @@ function runCode() {
 
   showBuildingAnimation("ast", "AST");
   showBuildingAnimation("cfg", "CFG");
+  showBuildingAnimation("ir", "IR");
   showBuildingAnimation("bytecode", "Bytecode");
 
   fetch("/start", {
@@ -725,6 +727,7 @@ function runCode() {
       stopAllBuildingAnimations();
       renderASTTree(data.ast_json || null);
       document.getElementById("cfg").innerText = data.cfg || "";
+      document.getElementById("ir").innerText = data.ir || "";
       document.getElementById("bytecode").innerText = data.bytecode || "";
 
       if (data.ai_precheck && !aiPrecheckShown) {
@@ -898,6 +901,7 @@ function resetCompiler() {
 
   document.getElementById("ast").innerHTML = "";
   document.getElementById("cfg").innerText = "";
+  document.getElementById("ir").innerText = "";
   document.getElementById("bytecode").innerText = "";
 
   stopAllBuildingAnimations();
