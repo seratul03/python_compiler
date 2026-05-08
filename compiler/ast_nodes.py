@@ -98,14 +98,14 @@ class FunctionDef(ASTNode):
     def __init__(self, name, params, body, decorators=None,
                  defaults=None, vararg=None, kwarg=None, kwonly_params=None, annotations=None):
         self.name = name
-        self.params = params          # list of positional param names (str)
+        self.params = params         
         self.body = body
         self.decorators = decorators or []
-        self.defaults = defaults or {}  # {param_name: default_node}
-        self.vararg = vararg            # name of *args param (str or None)
-        self.kwarg = kwarg              # name of **kwargs param (str or None)
-        self.kwonly_params = kwonly_params or []  # params after *args
-        self.annotations = annotations or {}      # type hints (ignored at runtime)
+        self.defaults = defaults or {}  
+        self.vararg = vararg            
+        self.kwarg = kwarg              
+        self.kwonly_params = kwonly_params or []  
+        self.annotations = annotations or {}     
 
 
 class Return(ASTNode):
@@ -169,8 +169,8 @@ class IndexAssignment(ASTNode):
 class ClassDef(ASTNode):
     def __init__(self, name, parent, body, bases=None):
         self.name = name
-        self.parent = parent        # first base (kept for backward compat)
-        self.bases = bases or ([parent] if parent else [])  # all bases
+        self.parent = parent
+        self.bases = bases or ([parent] if parent else [])  
         self.body = body
 
 

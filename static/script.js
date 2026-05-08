@@ -520,7 +520,7 @@ function setRunStatus(state, label) {
     idle: "Idle",
     running: "Running",
     waiting: "Waiting for input",
-    stalled: "Stalled",
+    stalled: "please Wait sir",
     stopped: "Stopped",
     error: "Error",
   };

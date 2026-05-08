@@ -632,14 +632,14 @@ class VirtualMachine:
                     self.stack.append(val)
 
             elif op == "IMPORT_MODULE":
-                names = instr.argument   # list of (name, alias) tuples
+                names = instr.argument   
                 for name, alias in names:
                     mod = _import_module(name)
                     store_as = alias if alias else name.split(".")[0]
                     self.current_frame().variables[store_as] = mod
 
             elif op == "IMPORT_FROM":
-                module_name, names = instr.argument   # names: list of (attr, alias)
+                module_name, names = instr.argument   
                 mod = _import_module(module_name)
                 for attr, alias in names:
                     store_as = alias if alias else attr

@@ -1167,6 +1167,17 @@ class Parser:
             self.eat("MULT")
             return Starred(self.bool_expr())
         expr = self.bool_expr()
+        if self.current() and self.current().type == "FOR":
+            self.eat("FOR")
+            var_name = self.eat("IDENT").value
+            self.eat("IN")
+            iterable = self._parse_for_iterable()
+            condition = None
+            if self.current() and self.current().type == "IF":
+                self.eat("IF")
+                condition = self.bool_expr()
+            return GeneratorExpr(expr, var_name, iterable, condition)
+            
         if (isinstance(expr, Variable) and
                 self.current() and self.current().type == "ASSIGN"):
             self.eat("ASSIGN")
